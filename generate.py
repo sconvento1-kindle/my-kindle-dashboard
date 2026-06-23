@@ -3,7 +3,7 @@ import datetime
 import glob
 import requests
 from PIL import Image, ImageDraw, ImageFont
-from icalevents import events_from_url
+import icalevents.client
 
 # 1. Canvas Configuration (Portrait layout)
 WIDTH, HEIGHT = 1080, 1440
@@ -54,7 +54,8 @@ if ical_url:
     try:
         start_time = datetime.datetime.now()
         end_time = start_time + datetime.timedelta(days=14)
-        fetched_events = events_from_url(ical_url, start=start_time, end=end_time)
+        # Use the direct client method instead
+        fetched_events = icalevents.client.events(url=ical_url, start=start_time, end=end_time)
         fetched_events.sort(key=lambda x: x.start)
         
         if fetched_events:
