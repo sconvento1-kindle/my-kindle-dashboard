@@ -1,9 +1,13 @@
 import os
 import datetime
+from zoneinfo import ZoneInfo
 import glob
 import requests
 from PIL import Image, ImageDraw, ImageFont
 from icalendar import Calendar
+
+# Set local timezone to Seregno/Italy
+LOCAL_TZ = ZoneInfo("Europe/Rome")
 
 # 1. Canvas Configuration (Portrait layout)
 WIDTH, HEIGHT = 1080, 1440
@@ -26,18 +30,16 @@ try:
         font_large = ImageFont.truetype(selected_font, 120)   # Main Clock
         font_medium = ImageFont.truetype(selected_font, 42)   # Date / Headers
         font_small = ImageFont.truetype(selected_font, 28)    # Regular Details
-        font_tiny = ImageFont.truetype(selected_font, 22)     # Forecast labels
     else:
         raise IOError
 except Exception:
-    font_large = font_medium = font_small = font_tiny = ImageFont.load_default()
+    font_large = font_medium = font_small = ImageFont.load_default()
 
 # 3. Weather Fetching (Current + Forecast)
 weather_main = "Sunny"
 temp_current = "18.6°C"
 temp_high_low = "28.7°C / 14.9°C"
 
-# Default fallback forecast data (Tue - Sat)
 forecast_data = [
     {"day": "Tue", "icon": "sunny", "high": "28.7°", "low": "14.9°"},
     {"day": "Wed", "icon": "cloudy", "high": "24.1°", "low": "14.2°"},
@@ -67,12 +69,12 @@ if api_key:
             daily_temps[day_name]["temps"].append(item['main']['temp'])
             daily_temps[day_name]["icons"].append(item['weather'][0]['main'].lower())
 
-        today_name = datetime.datetime.now().strftime("%a")
+        today_name = datetime.datetime.now(LOCAL_TZ).strftime("%a")
         if today_name in daily_temps:
             temp_high_low = f"{round(max(daily_temps[today_name]['temps']), 1)}°C / {round(min(daily_temps[today_name]['temps']), 1)}°C"
 
         forecast_data = []
-        now_dt = datetime.datetime.now()
+        now_dt = datetime.datetime.now(LOCAL_TZ)
         
         for i in range(5):
             target_day = (now_dt + datetime.timedelta(days=i)).strftime("%a")
@@ -117,7 +119,8 @@ if ical_url:
         
         raw_events.sort(key=lambda x: x[0])
         for start_dt, summary, all_day in raw_events[:10]:
-            local_start = start_dt.astimezone()
+            # Convert specifically to your local time zone
+            local_start = start_dt.astimezone(LOCAL_TZ)
             date_str = local_start.strftime("%b %d - %H:%M") if not all_day else f"{local_start.strftime('%b %d')} - All Day"
             calendar_events.append(f"[{date_str}] {summary}")
     except Exception:
@@ -128,8 +131,8 @@ if not calendar_events:
 
 # --- DRAW COMPACT CONTAINER INTERFACE ---
 
-# 1. Left Column / Top Section: Clock & Date
-now = datetime.datetime.now()
+# 1. Left Column / Top Section: Clock & Date (Enforced Local Time)
+now = datetime.datetime.now(LOCAL_TZ)
 draw.text((60, 80), now.strftime("%H:%M"), fill=BLACK, font=font_large)
 draw.text((60, 210), now.strftime("%A, %b %d"), fill=BLACK, font=font_medium)
 
@@ -140,15 +143,13 @@ card_r = 24
 
 draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y2], radius=card_r, outline=BLACK, width=3)
 
-# Helper function to draw crisp icons manually with validated closures
 def draw_weather_icon(cx, cy, type_str):
     if type_str == "sunny":
         draw.ellipse([cx - 24, cy - 24, cx + 24, cy + 24], fill=WHITE, outline=BLACK, width=4)
-    else:  # Cloudy overlapping shapes
+    else:
         draw.ellipse([cx - 22, cy - 10, cx + 10, cy + 22], fill=WHITE, outline=BLACK, width=4)
         draw.ellipse([cx - 5, cy - 22, cx + 25, cy + 18], fill=WHITE, outline=BLACK, width=4)
 
-# Render main card info
 main_icon_type = "sunny" if "sun" in weather_main.lower() or "clear" in weather_main.lower() else "cloudy"
 draw_weather_icon(140, 420, main_icon_type)
 
@@ -158,7 +159,6 @@ draw.text((230, 425), "AccuWeather", fill=BLACK, font=font_small)
 draw.text((card_x2 - 250, 370), temp_current, fill=BLACK, font=font_medium)
 draw.text((card_x2 - 250, 425), temp_high_low, fill=BLACK, font=font_small)
 
-# Draw horizontal forecast segment labels inside card
 start_row_x = card_x1 + 40
 row_width = (card_x2 - card_x1 - 80) // 4
 icon_y = 570
@@ -184,5 +184,4 @@ for event in calendar_events[:5]:
     draw.text((60, y_offset), event, fill=BLACK, font=font_small)
     y_offset += 80
 
-# Save final graphic
 image.save("dashboard.png", "PNG")
