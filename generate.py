@@ -49,16 +49,13 @@ forecast_data = [
 api_key = os.environ.get("WEATHER_API_KEY")
 if api_key:
     try:
-        # Fetch current conditions & 5-day forecast
         url = f"https://api.openweathermap.org/data/2.5/forecast?q=Seregno,it&units=metric&appid={api_key}"
         data = requests.get(url).json()
         
-        # Parse current (first element)
         current = data['list'][0]
         temp_current = f"{round(current['main']['temp'], 1)}°C"
         weather_main = current['weather'][0]['main']
         
-        # Group forecast items by day to extract daily highs and lows
         daily_temps = {}
         for item in data['list']:
             date_str = item['dt_txt'].split(" ")[0]
@@ -70,14 +67,11 @@ if api_key:
             daily_temps[day_name]["temps"].append(item['main']['temp'])
             daily_temps[day_name]["icons"].append(item['weather'][0]['main'].lower())
 
-        # Sync high/low for today
         today_name = datetime.datetime.now().strftime("%a")
         if today_name in daily_temps:
             temp_high_low = f"{round(max(daily_temps[today_name]['temps']), 1)}°C / {round(min(daily_temps[today_name]['temps']), 1)}°C"
 
-        # Build 5-day horizontal forecast row
         forecast_data = []
-        days_built = 0
         now_dt = datetime.datetime.now()
         
         for i in range(5):
@@ -134,24 +128,61 @@ if not calendar_events:
 
 # --- DRAW COMPACT CONTAINER INTERFACE ---
 
-# Layout guidelines (Two unequal horizontal zones)
-# Top half: Time, Date & Clean Weather Card
-# Bottom half: Agenda box
-
 # 1. Left Column / Top Section: Clock & Date
 now = datetime.datetime.now()
 draw.text((60, 80), now.strftime("%H:%M"), fill=BLACK, font=font_large)
 draw.text((60, 210), now.strftime("%A, %b %d"), fill=BLACK, font=font_medium)
 
-# 2. Weather Container Card (Matching the user screenshot style)
-# Dimensions & bounding box for the widget card
+# 2. Weather Container Card
 card_x1, card_y1 = 60, 320
 card_x2, card_y2 = WIDTH - 60, 780
-card_r = 24  # Rounded corner radius
+card_r = 24
 
 draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y2], radius=card_r, outline=BLACK, width=3)
 
-# Helper function to draw crisp icons manually
+# Helper function to draw crisp icons manually with validated closures
 def draw_weather_icon(cx, cy, type_str):
     if type_str == "sunny":
-        draw.ellipse(
+        draw.ellipse([cx - 24, cy - 24, cx + 24, cy + 24], fill=WHITE, outline=BLACK, width=4)
+    else:  # Cloudy overlapping shapes
+        draw.ellipse([cx - 22, cy - 10, cx + 10, cy + 22], fill=WHITE, outline=BLACK, width=4)
+        draw.ellipse([cx - 5, cy - 22, cx + 25, cy + 18], fill=WHITE, outline=BLACK, width=4)
+
+# Render main card info
+main_icon_type = "sunny" if "sun" in weather_main.lower() or "clear" in weather_main.lower() else "cloudy"
+draw_weather_icon(140, 420, main_icon_type)
+
+draw.text((230, 370), weather_main, fill=BLACK, font=font_medium)
+draw.text((230, 425), "AccuWeather", fill=BLACK, font=font_small)
+
+draw.text((card_x2 - 250, 370), temp_current, fill=BLACK, font=font_medium)
+draw.text((card_x2 - 250, 425), temp_high_low, fill=BLACK, font=font_small)
+
+# Draw horizontal forecast segment labels inside card
+start_row_x = card_x1 + 40
+row_width = (card_x2 - card_x1 - 80) // 4
+icon_y = 570
+
+for idx, day in enumerate(forecast_data[:5]):
+    pos_x = start_row_x + (idx * row_width)
+    if idx == 4:
+        pos_x = card_x2 - 70
+        
+    draw.text((pos_x - 20, 500), day["day"], fill=BLACK, font=font_small)
+    draw_weather_icon(pos_x, icon_y, day["icon"])
+    draw.text((pos_x - 30, 640), day["high"], fill=BLACK, font=font_small)
+    draw.text((pos_x - 30, 685), day["low"], fill=BLACK, font=font_small)
+
+# 3. Bottom Section: Upcoming Agenda Box
+draw.text((60, 840), "UPCOMING AGENDA", fill=BLACK, font=font_medium)
+draw.line([(60, 900), (WIDTH - 60, 900)], fill=BLACK, width=4)
+
+y_offset = 940
+for event in calendar_events[:5]:
+    if len(event) > 65:
+        event = event[:62] + "..."
+    draw.text((60, y_offset), event, fill=BLACK, font=font_small)
+    y_offset += 80
+
+# Save final graphic
+image.save("dashboard.png", "PNG")
