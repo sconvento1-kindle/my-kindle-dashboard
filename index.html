@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kindle Dashboard</title>
+    <style>
+        /* Optimizing strictly for E-Ink: High contrast, no animations, crisp fonts */
+        body {
+            background-color: #ffffff;
+            color: #000000;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            width: 1448px;  /* Kindle Paperwhite 10th Gen Landscape Width */
+            height: 1072px; /* Kindle Paperwhite 10th Gen Landscape Height */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        #clock {
+            font-size: 160px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            letter-spacing: -2px;
+        }
+        #date {
+            font-size: 45px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+    </style>
+    
+    <script>
+        // Force the Kindle browser to completely reload the page every 60 seconds
+        setTimeout(function(){
+            window.location.reload(1);
+        }, 60000);
+
+        function updateTime() {
+            var now = new Date();
+            var hours = now.getHours().toString().padStart(2, '0');
+            var minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('clock').innerHTML = hours + ":" + minutes;
+
+            var options = { weekday: 'long', month: 'long', day: 'numeric' };
+            document.getElementById('date').innerHTML = now.toLocaleDateString('en-US', options);
+        }
+        window.onload = updateTime;
+    </script>
+</head>
+<body>
+
+    <div id="clock">00:00</div>
+    <div id="date">Loading Date...</div>
+
+</body>
+</html>
