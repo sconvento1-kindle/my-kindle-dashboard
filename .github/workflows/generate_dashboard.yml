@@ -1,0 +1,34 @@
+name: Generate Kindle Calendar Dashboard
+on:
+  schedule:
+    - cron: '*/15 * * * *' # Automatically runs every 15 minutes
+  workflow_dispatch: # Allows you to manually trigger it to test
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-module: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests icalendar pillow
+
+      - name: Run Dashboard Generator
+        run: python generate.py
+        env:
+          CALENDAR_URL: ${{ secrets.CALENDAR_URL }}
+
+      - name: Commit and Push Image
+        run: |
+          git config --global user.name "Dashboard Bot"
+          git config --global user.email "bot@github.com"
+          git add dashboard.png
+          git commit -m "Update Dashboard Image" || exit 0
+          git push
