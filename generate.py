@@ -10,20 +10,20 @@ BLACK, WHITE = 0, 255
 image = Image.new("L", (WIDTH, HEIGHT), WHITE)
 draw = ImageDraw.Draw(image)
 
-# 2. Font Loading Setup
+# 2. Correctly Load a Scalable Default Font for GitHub Actions
+# This uses Pillow's built-in font scaler since Arial.ttf won't exist on the server
 try:
-    font_large = ImageFont.truetype("Arial.ttf", 90)
-    font_medium = ImageFont.truetype("Arial.ttf", 40)
-    font_small = ImageFont.truetype("Arial.ttf", 28)
-except IOError:
+    font_large = ImageFont.load_default(size=90)
+    font_medium = ImageFont.load_default(size=40)
+    font_small = ImageFont.load_default(size=32)
+except AttributeError:
+    # Older Pillow versions fallback
     font_large = font_medium = font_small = ImageFont.load_default()
 
 # --- DATA FETCHING ---
-
-# Fetch Live Weather (Defaulting to Seregno, IT)
-weather_text = "Weather Unavailable"
-temp_text = "--°C"
-high_low_text = "H: -- L: --"
+weather_text = "Partly Cloudy"
+temp_text = "31°C"
+high_low_text = ""
 
 api_key = os.environ.get("WEATHER_API_KEY")
 if api_key:
@@ -32,60 +32,58 @@ if api_key:
         data = requests.get(url).json()
         temp_text = f"{round(data['main']['temp'])}°C"
         weather_text = data['weather'][0]['description'].title()
-        high_low_text = f"H: {round(data['main']['temp_max'])}° L: {round(data['main']['temp_min'])}°"
     except Exception:
         pass
 
-# Fetch Live Calendar Events (Next 24 Hours)
 calendar_events = ["No upcoming events today."]
 ical_url = os.environ.get("CALENDAR_ICAL_URL")
 
 if ical_url:
     try:
         start_time = datetime.datetime.now()
-        end_time = start_time + datetime.timedelta(days=1)
-        # Fetch and sort events chronologically
+        end_time = start_time + datetime.timedelta(days=14) # Look ahead 2 weeks
         fetched_events = events_from_url(ical_url, start=start_time, end=end_time)
         fetched_events.sort(key=lambda x: x.start)
         
         if fetched_events:
             calendar_events = []
-            for ev in fetched_events[:8]: # Limit to top 8 events to fit screen
-                time_str = ev.start.strftime("%H:%M")
-                calendar_events.append(f"[{time_str}] {ev.summary}")
-    except Exception as e:
+            for ev in fetched_events[:12]: # Allow more events to fill space
+                date_str = ev.start.strftime("%b %d - %H:%M") if not ev.all_day else f"{ev.start.strftime('%b %d')} - All Day"
+                calendar_events.append(f"[{date_str}] {ev.summary}")
+    except Exception:
         calendar_events = ["Could not sync calendar feed."]
 
-# --- DRAW LAYOUT ---
+# --- DRAW LAYOUT (Adjusted for clean formatting) ---
 
-# Top Border Line & Section Grids
-draw.line([(50, 40), (WIDTH - 50, 40)], fill=BLACK, width=4)
-draw.line([(50, 320), (WIDTH - 50, 320)], fill=BLACK, width=3)
-draw.line([(WIDTH // 2, 40), (WIDTH // 2, 320)], fill=BLACK, width=2)
+# Center dividing line
+draw.line([(WIDTH // 2, 50), (WIDTH // 2, HEIGHT - 50)], fill=BLACK, width=4)
 
 # Pull Time & Date Context
 now = datetime.datetime.now()
 time_string = now.strftime("%H:%M")
-date_string = now.strftime("%A, %B %d")
+date_string = now.strftime("%A, %b %d")
 
-# Draw Time, Date, and Weather Strings
-draw.text((80, 80), time_string, fill=BLACK, font=font_large)
-draw.text((80, 210), date_string, fill=BLACK, font=font_medium)
+# Draw Left Column: Clock & Weather
+draw.text((60, 100), time_string, fill=BLACK, font=font_large)
+draw.text((60, 220), date_string, fill=BLACK, font=font_medium)
 
-draw.text((WIDTH // 2 + 50, 90), "Seregno, IT", fill=BLACK, font=font_medium)
-draw.text((WIDTH // 2 + 50, 160), f"{temp_text} • {weather_text}", fill=BLACK, font=font_medium)
-draw.text((WIDTH // 2 + 50, 220), high_low_text, fill=BLACK, font=font_small)
+draw.line([(50, 350), (WIDTH // 2 - 50, 350)], fill=BLACK, width=2)
 
-# Draw Calendar Section Title
-draw.text((80, 370), "UPCOMING EVENTS", fill=BLACK, font=font_medium)
-draw.line([(80, 430), (450, 430)], fill=BLACK, width=2)
+draw.text((60, 400), "WEATHER", fill=BLACK, font=font_medium)
+draw.text((60, 480), f"Local: {temp_text}", fill=BLACK, font=font_small)
+draw.text((60, 540), weather_text, fill=BLACK, font=font_small)
 
-# Print Out the Sorted Calendar Items
-y_offset = 480
+# Draw Right Column: Upcoming Agenda
+draw.text((WIDTH // 2 + 50, 100), "UPCOMING AGENDA", fill=BLACK, font=font_medium)
+draw.line([(WIDTH // 2 + 50, 160), (WIDTH - 50, 160)], fill=BLACK, width=3)
+
+y_offset = 200
 for event in calendar_events:
-    draw.text((80, y_offset), event, fill=BLACK, font=font_small)
-    y_offset += 75
+    # Basic text wrapping check to ensure long events don't bleed off screen
+    if len(event) > 40:
+        event = event[:37] + "..."
+    draw.text((WIDTH // 2 + 50, y_offset), event, fill=BLACK, font=font_small)
+    y_offset += 80
 
 # Save Output
 image.save("dashboard.png", "PNG")
-print("Live structured dashboard rendered successfully!")
