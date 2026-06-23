@@ -3,7 +3,7 @@ import datetime
 import glob
 import requests
 from PIL import Image, ImageDraw, ImageFont
-import icalevents.client
+from icalendar import Calendar
 
 # 1. Canvas Configuration (Portrait layout)
 WIDTH, HEIGHT = 1080, 1440
@@ -11,7 +11,7 @@ BLACK, WHITE = 0, 255
 image = Image.new("L", (WIDTH, HEIGHT), WHITE)
 draw = ImageDraw.Draw(image)
 
-# 2. BULLETPROOF FONT LOADING
+# 2. Robust Font Loading
 system_fonts = glob.glob("/usr/share/fonts/truetype/**/*.ttf", recursive=True)
 selected_font = None
 
@@ -33,7 +33,7 @@ try:
 except Exception:
     font_large = font_medium = font_small = ImageFont.load_default()
 
-# --- DATA FETCHING ---
+# 3. Weather Fetching
 weather_text = "Partly Cloudy"
 temp_text = "31°C"
 
@@ -47,46 +47,62 @@ if api_key:
     except Exception:
         pass
 
-calendar_events = ["No upcoming events today."]
+# 4. Calendar Fetching
+calendar_events = []
 ical_url = os.environ.get("CALENDAR_ICAL_URL")
 
 if ical_url:
     try:
-        start_time = datetime.datetime.now()
-        end_time = start_time + datetime.timedelta(days=14)
-        # Use the direct client method instead
-        fetched_events = icalevents.client.events(url=ical_url, start=start_time, end=end_time)
-        fetched_events.sort(key=lambda x: x.start)
+        response = requests.get(ical_url, timeout=10)
+        gcal = Calendar.from_ical(response.content)
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
+        future_dt = now_dt + datetime.timedelta(days=14)
         
-        if fetched_events:
-            calendar_events = []
-            for ev in fetched_events[:12]:
-                date_str = ev.start.strftime("%b %d - %H:%M") if not ev.all_day else f"{ev.start.strftime('%b %d')} - All Day"
-                calendar_events.append(f"[{date_str}] {ev.summary}")
+        raw_events = []
+        for component in gcal.walk():
+            if component.name == "VEVENT":
+                summary = str(component.get('summary'))
+                start = component.get('dtstart').dt
+                
+                if isinstance(start, datetime.date) and not isinstance(start, datetime.datetime):
+                    start_dt = datetime.datetime.combine(start, datetime.time.min).replace(tzinfo=datetime.timezone.utc)
+                    all_day = True
+                else:
+                    start_dt = start.astimezone(datetime.timezone.utc) if start.tzinfo else start.replace(tzinfo=datetime.timezone.utc)
+                    all_day = False
+                
+                if now_dt <= start_dt <= future_dt:
+                    raw_events.append((start_dt, summary, all_day))
+        
+        raw_events.sort(key=lambda x: x[0])
+        
+        for start_dt, summary, all_day in raw_events[:12]:
+            local_start = start_dt.astimezone()
+            date_str = local_start.strftime("%b %d - %H:%M") if not all_day else f"{local_start.strftime('%b %d')} - All Day"
+            calendar_events.append(f"[{date_str}] {summary}")
+            
     except Exception:
         calendar_events = ["Could not sync calendar feed."]
 
-# --- DRAW LAYOUT ---
+if not calendar_events:
+    calendar_events = ["No upcoming events today."]
 
-# Center dividing line
+# 5. Drawing the Visual Layout
 draw.line([(WIDTH // 2, 50), (WIDTH // 2, HEIGHT - 50)], fill=BLACK, width=5)
 
-# Current Time & Date strings
 now = datetime.datetime.now()
 time_string = now.strftime("%H:%M")
 date_string = now.strftime("%A, %b %d")
 
-# Draw Left Column
+# Left Column
 draw.text((60, 100), time_string, fill=BLACK, font=font_large)
 draw.text((60, 240), date_string, fill=BLACK, font=font_medium)
-
 draw.line([(60, 380), (WIDTH // 2 - 60, 380)], fill=BLACK, width=3)
-
 draw.text((60, 440), "WEATHER", fill=BLACK, font=font_medium)
 draw.text((60, 520), f"Local: {temp_text}", fill=BLACK, font=font_small)
 draw.text((60, 580), weather_text, fill=BLACK, font=font_small)
 
-# Draw Right Column
+# Right Column
 draw.text((WIDTH // 2 + 60, 100), "UPCOMING AGENDA", fill=BLACK, font=font_medium)
 draw.line([(WIDTH // 2 + 60, 160), (WIDTH - 60, 160)], fill=BLACK, width=4)
 
@@ -97,5 +113,5 @@ for event in calendar_events:
     draw.text((WIDTH // 2 + 60, y_offset), event, fill=BLACK, font=font_small)
     y_offset += 85
 
-# Save Output
+# Save Output Image
 image.save("dashboard.png", "PNG")
