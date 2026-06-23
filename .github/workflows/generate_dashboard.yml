@@ -18,7 +18,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install requests icalendar pillow
+          pip install Pillow requests icalevents
 
       - name: Run Dashboard Generator
         run: python generate.py
