@@ -5,7 +5,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: '0 * * * *' # Automatically refreshes at the top of every hour
+    - cron: '0 * * * *' # Refreshes every single hour automatically
 
 jobs:
   build:
@@ -24,7 +24,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y fonts-liberation
-        pip install Pillow requests icalevents
+        pip install Pillow requests icalendar
 
     - name: Run Dashboard Generator
       env:
