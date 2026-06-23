@@ -3,7 +3,7 @@ import datetime
 import glob
 import requests
 from PIL import Image, ImageDraw, ImageFont
-from icalevents.icalevents import events_from_url
+from icalevents import events_from_url
 
 # 1. Canvas Configuration (Portrait layout)
 WIDTH, HEIGHT = 1080, 1440
