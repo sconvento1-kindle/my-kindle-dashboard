@@ -1,60 +1,145 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kindle Dashboard</title>
+    <title>Kindle Home Dashboard</title>
     <style>
-        /* Optimizing strictly for E-Ink: High contrast, no animations, crisp fonts */
         body {
             background-color: #ffffff;
             color: #000000;
-            font-family: Arial, sans-serif;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
-            padding: 0;
-            width: 1448px;  /* Kindle Paperwhite 10th Gen Landscape Width */
-            height: 1072px; /* Kindle Paperwhite 10th Gen Landscape Height */
+            padding: 40px;
+            width: 1368px; /* Adjusted for padding */
+            height: 992px;  /* Adjusted for padding */
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            justify-content: space-between;
+            box-sizing: border-box;
             overflow: hidden;
         }
+
+        /* Top Section: Time and Date */
+        .top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 5px solid #000000;
+            padding-bottom: 30px;
+        }
         #clock {
-            font-size: 160px;
+            font-size: 140px;
             font-weight: bold;
-            margin-bottom: 20px;
-            letter-spacing: -2px;
+            line-height: 1;
         }
         #date {
-            font-size: 45px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+            font-size: 40px;
+            text-align: right;
+            margin-top: 20px;
+        }
+
+        /* Middle Section: Weather Panel */
+        .weather-box {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            background-color: #ffffff;
+            border: 4px solid #000000;
+            padding: 40px;
+            margin: 40px 0;
+            border-radius: 10px;
+        }
+        #temp {
+            font-size: 110px;
+            font-weight: bold;
+        }
+        #condition {
+            font-size: 50px;
+            text-transform: capitalize;
+        }
+
+        /* Bottom Section: Quote/Greeting */
+        .bottom-row {
+            text-align: center;
+            font-size: 35px;
+            font-style: italic;
+            padding: 20px;
+            border-top: 2px dashed #000000;
         }
     </style>
-    
-    <script>
-        // Force the Kindle browser to completely reload the page every 60 seconds
-        setTimeout(function(){
-            window.location.reload(1);
-        }, 60000);
-
-        function updateTime() {
-            var now = new Date();
-            var hours = now.getHours().toString().padStart(2, '0');
-            var minutes = now.getMinutes().toString().padStart(2, '0');
-            document.getElementById('clock').innerHTML = hours + ":" + minutes;
-
-            var options = { weekday: 'long', month: 'long', day: 'numeric' };
-            document.getElementById('date').innerHTML = now.toLocaleDateString('en-US', options);
-        }
-        window.onload = updateTime;
-    </script>
 </head>
 <body>
 
-    <div id="clock">00:00</div>
-    <div id="date">Loading Date...</div>
+    <div class="top-row">
+        <div id="clock">00:00</div>
+        <div id="date">Loading Date...</div>
+    </div>
 
+    <div class="weather-box">
+        <div id="temp">--°C</div>
+        <div id="condition">Fetching weather...</div>
+    </div>
+
+    <div class="bottom-row">
+        <div id="quote">"Simplicity is the ultimate sophistication."</div>
+    </div>
+
+    <script>
+        // Auto-refresh the whole page every 15 minutes to pull fresh weather data
+        setTimeout(function() {
+            window.location.reload(true);
+        }, 900000); 
+
+        function updateTime() {
+            var now = new Date();
+            var hours = now.getHours();
+            var minutes = now.getMinutes();
+            if (hours < 10) { hours = "0" + hours; }
+            if (minutes < 10) { minutes = "0" + minutes; }
+            document.getElementById('clock').innerHTML = hours + ":" + minutes;
+
+            var days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            document.getElementById('date').innerHTML = days[now.getDay()] + "<br>" + months[now.getMonth()] + " " + now.getDate();
+        }
+
+        function fetchWeather() {
+            // Using a free, open API that doesn't require a login key. 
+            // Default location set to Milan/Lombardy area (Latitude: 45.6, Longitude: 9.2)
+            var url = "https://api.open-meteo.com/v1/forecast?latitude=45.6&longitude=9.2&current_weather=true";
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    var current = data.current_weather;
+                    
+                    // Display Temp rounded to whole number
+                    document.getElementById('temp').innerHTML = Math.round(current.temperature) + "°C";
+                    
+                    // Convert weather codes to simple text descriptions
+                    var code = current.weathercode;
+                    var desc = "Clear Skies";
+                    if (code >= 1 && code <= 3) desc = "Partly Cloudy";
+                    else if (code >= 45 && code <= 48) desc = "Foggy";
+                    else if (code >= 51 && code <= 67) desc = "Raining";
+                    else if (code >= 71 && code <= 77) desc = "Snowing";
+                    else if (code >= 80 && code <= 82) desc = "Showers";
+                    else if (code >= 95) desc = "Thunderstorm";
+                    
+                    document.getElementById('condition').innerHTML = desc;
+                }
+            };
+            xhr.send();
+        }
+
+        // Run updates
+        updateTime();
+        fetchWeather();
+        
+        // Keep clock ticking every second locally
+        setInterval(updateTime, 1000);
+    </script>
 </body>
 </html>
