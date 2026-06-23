@@ -1,68 +1,91 @@
-from PIL import Image, ImageDraw, ImageFont
+import os
 import datetime
+import requests
+from PIL import Image, ImageDraw, ImageFont
+from icalevents.icalevents import events_from_url
 
-# 1. Define Kindle screen dimensions (Portrait layout)
+# 1. Canvas Configuration (Portrait layout)
 WIDTH, HEIGHT = 1080, 1440
-BLACK = 0  # 8-bit grayscale black
-WHITE = 255  # 8-bit grayscale white
-
-# 2. Create a blank white canvas (L mode = 8-bit pixels, black and white)
+BLACK, WHITE = 0, 255
 image = Image.new("L", (WIDTH, HEIGHT), WHITE)
 draw = ImageDraw.Draw(image)
 
-# 3. Load clean, readable system fonts (adjust sizes for high-contrast visibility)
+# 2. Font Loading Setup
 try:
-    font_large = ImageFont.truetype("Arial.ttf", 90)  # For the time
-    font_medium = ImageFont.truetype("Arial.ttf", 40)  # For dates & weather headline
-    font_small = ImageFont.truetype("Arial.ttf", 28)  # For calendar items
+    font_large = ImageFont.truetype("Arial.ttf", 90)
+    font_medium = ImageFont.truetype("Arial.ttf", 40)
+    font_small = ImageFont.truetype("Arial.ttf", 28)
 except IOError:
-    # Fallback to default if Arial isn't available in your GitHub action environment
     font_large = font_medium = font_small = ImageFont.load_default()
 
-# --- DESIGN LAYOUT ---
+# --- DATA FETCHING ---
 
-# Top Border Line
+# Fetch Live Weather (Defaulting to Seregno, IT)
+weather_text = "Weather Unavailable"
+temp_text = "--°C"
+high_low_text = "H: -- L: --"
+
+api_key = os.environ.get("WEATHER_API_KEY")
+if api_key:
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/weather?q=Seregno,it&units=metric&appid={api_key}"
+        data = requests.get(url).json()
+        temp_text = f"{round(data['main']['temp'])}°C"
+        weather_text = data['weather'][0]['description'].title()
+        high_low_text = f"H: {round(data['main']['temp_max'])}° L: {round(data['main']['temp_min'])}°"
+    except Exception:
+        pass
+
+# Fetch Live Calendar Events (Next 24 Hours)
+calendar_events = ["No upcoming events today."]
+ical_url = os.environ.get("CALENDAR_ICAL_URL")
+
+if ical_url:
+    try:
+        start_time = datetime.datetime.now()
+        end_time = start_time + datetime.timedelta(days=1)
+        # Fetch and sort events chronologically
+        fetched_events = events_from_url(ical_url, start=start_time, end=end_time)
+        fetched_events.sort(key=lambda x: x.start)
+        
+        if fetched_events:
+            calendar_events = []
+            for ev in fetched_events[:8]: # Limit to top 8 events to fit screen
+                time_str = ev.start.strftime("%H:%M")
+                calendar_events.append(f"[{time_str}] {ev.summary}")
+    except Exception as e:
+        calendar_events = ["Could not sync calendar feed."]
+
+# --- DRAW LAYOUT ---
+
+# Top Border Line & Section Grids
 draw.line([(50, 40), (WIDTH - 50, 40)], fill=BLACK, width=4)
-
-# Section Split: Horizontal line separating Header from Calendar
 draw.line([(50, 320), (WIDTH - 50, 320)], fill=BLACK, width=3)
-
-# Section Split: Vertical line separating Time from Weather
 draw.line([(WIDTH // 2, 40), (WIDTH // 2, 320)], fill=BLACK, width=2)
 
-# --- DRAW DATA ---
-
-# Fetch current time variables
+# Pull Time & Date Context
 now = datetime.datetime.now()
 time_string = now.strftime("%H:%M")
 date_string = now.strftime("%A, %B %d")
 
-# Place Time & Date (Left Header Block)
+# Draw Time, Date, and Weather Strings
 draw.text((80, 80), time_string, fill=BLACK, font=font_large)
 draw.text((80, 210), date_string, fill=BLACK, font=font_medium)
 
-# Placeholder Weather Data (Right Header Block)
 draw.text((WIDTH // 2 + 50, 90), "Seregno, IT", fill=BLACK, font=font_medium)
-draw.text((WIDTH // 2 + 50, 160), "24°C • Sunny", fill=BLACK, font=font_medium)
-draw.text(
-    (WIDTH // 2 + 50, 220), "H: 26° L: 14°", fill=BLACK, font=font_small
-)
+draw.text((WIDTH // 2 + 50, 160), f"{temp_text} • {weather_text}", fill=BLACK, font=font_medium)
+draw.text((WIDTH // 2 + 50, 220), high_low_text, fill=BLACK, font=font_small)
 
-# Placeholder Calendar Section (Bottom Block)
+# Draw Calendar Section Title
 draw.text((80, 370), "UPCOMING EVENTS", fill=BLACK, font=font_medium)
 draw.line([(80, 430), (450, 430)], fill=BLACK, width=2)
 
-events = [
-    "[17:00] Account Surfaces Review Meeting",
-    "[18:30] Walk Zoe and Stache 🐾",
-    "[20:00] Dinner with team",
-]
-
+# Print Out the Sorted Calendar Items
 y_offset = 480
-for event in events:
+for event in calendar_events:
     draw.text((80, y_offset), event, fill=BLACK, font=font_small)
-    y_offset += 65
+    y_offset += 75
 
-# --- SAVE IMAGE ---
+# Save Output
 image.save("dashboard.png", "PNG")
-print("Dashboard blueprint generated successfully!")
+print("Live structured dashboard rendered successfully!")
