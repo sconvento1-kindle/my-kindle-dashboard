@@ -21,11 +21,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          # Rimossa la riga della cache che causava l'errore
 
       - name: Install Dependencies
         run: |
-          pip install Pillow requests google-auth google-auth-oauthlib google-api-python-client
+          pip install Pillow requests google-auth google-api-python-client pytz
 
       - name: Run Generator Script
         env:
