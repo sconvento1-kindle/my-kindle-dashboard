@@ -12,11 +12,9 @@ FG_COLOR = 0    # Nero assoluto
 
 def get_real_weather():
     """Recupera i dati meteo reali per Seregno usando l'API gratuita di Open-Meteo"""
-    # Coordinate geografiche di Seregno
     LAT, LON = 45.6485, 9.2044
     url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current=temperature_2m,weather_code&timezone=Europe%2FRome"
     
-    # Mappatura semplificata dei codici meteo WMO in testo italiano
     weather_codes = {
         0: "Cielo Sereno", 1: "Preval. Sereno", 2: "Parz. Nuvoloso", 3: "Nuvoloso",
         45: "Nebbia", 48: "Nebbia Brinata", 51: "Pioggerella Leggera", 53: "Pioggerella",
@@ -31,13 +29,10 @@ def get_real_weather():
         current = data["current"]
         temp = round(current["temperature_2m"])
         code = current["weather_code"]
-        
-        # Cerca la descrizione del codice meteo, altrimenti usa un valore generico
         condizione = weather_codes.get(code, "Variabile")
         return f"{temp}°C, {condizione}"
     except Exception:
-        # Fallback in caso di errore di rete durante il workflow
-        return "22°C, Dati Non Disponibili"
+        return "Dati Non Disponibili"
 
 def create_dashboard():
     # 1. Inizializza l'immagine in scala di grigi
@@ -54,9 +49,9 @@ def create_dashboard():
         font_medium = ImageFont.load_default()
         font_regular = ImageFont.load_default()
 
-    # --- SEZIONE 1: OROLOGIO E DATA ---
+    # --- SEZIONE 1: OROLOGIO E DATA CON FUSO ORARIO ITALIANO ---
     fuso_orario = pytz.timezone('Europe/Rome')
-    now = datetime.datetime.now(fuso_oraway) if 'fuso_oraway' in locals() else datetime.datetime.now(fuso_orario)
+    now = datetime.datetime.now(fuso_orario) # Corretto l'errore di battitura qui
     
     time_str = now.strftime("%H:%M")
     days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"]
@@ -93,13 +88,8 @@ def create_dashboard():
     # --- SEZIONE 3: METEO REALE DI SEREGNO ---
     weather_info = get_real_weather()
     
-    # Scritta dell'intestazione Meteo ben visibile
     draw.text((80, 455), "METEO SEREGNO", font=font_medium, fill=FG_COLOR)
-    
-    # Dati meteo reali scaricati dall'API
     draw.text((80, 500), weather_info, font=font_regular, fill=FG_COLOR)
-    
-    # Statistiche di stato inferiori
     draw.text((80, 540), "🔋 82%   |   🌡️ Interno: 21.5°C", font=font_regular, fill=FG_COLOR)
 
     # 4. Salva l'immagine
@@ -108,7 +98,7 @@ def create_dashboard():
         
     img_monochrome = img.convert('1')
     img_monochrome.save(os.path.join(OUTPUT_DIR, "dashboard.png"), "PNG")
-    print("Dashboard generata con meteo reale!")
+    print("Dashboard generata con successo!")
 
 if __name__ == "__main__":
     create_dashboard()
