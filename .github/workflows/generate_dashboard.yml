@@ -1,41 +1,41 @@
-name: Generate Kindle Calendar Dashboard
+name: Generate Kindle Dashboard
 
 on:
-  push:
-    branches:
-      - main
   schedule:
-    - cron: '0 * * * *' # Refreshes every single hour automatically
+    - cron: '*/30 * * * *' # Gira ogni 30 minuti
+  workflow_dispatch: # Ti permette di avviarlo manualmente con un click da GitHub
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
+    runs-on: Ubuntu-latest
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-python-version: '3.10'
+          cache: 'pip'
 
-    - name: Install System Fonts & Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y fonts-liberation
-        pip install Pillow requests icalendar
+      - name: Install Dependencies
+        run: |
+          pip install Pillow requests google-auth google-auth-oauthlib google-api-python-client
 
-    - name: Run Dashboard Generator
-      env:
-        WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
-        CALENDAR_ICAL_URL: ${{ secrets.CALENDAR_ICAL_URL }}
-      run: python generate.py
+      - name: Run Generator Script
+        env:
+          GOOGLE_CALENDAR_ID: ${{ secrets.GOOGLE_CALENDAR_ID }}
+          # Inserisci qui le tue chiavi del meteo o credenziali come GitHub Secrets
+        run: python generate.py
 
-    - name: Commit and Push Updated Image
-      run: |
-        git config --global user.name "GitHub Action Bot"
-        git config --global user.email "actions@github.com"
-        git add dashboard.png
-        git commit -m "Automated dashboard image update" || echo "No changes to commit"
-        git push
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./output # Lo script salverà l'immagine qui
+          force_orphan: true # Sovrascrive la cronologia mantenendo il file leggero ed evitando lag di aggiornamento
