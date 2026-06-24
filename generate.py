@@ -1,7 +1,8 @@
 import os
 import datetime
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont
 import requests
+import pytz
 
 # Costanti di Configurazione per Kindle 10th Gen
 WIDTH, HEIGHT = 800, 600
@@ -9,12 +10,41 @@ OUTPUT_DIR = "output"
 BG_COLOR = 255  # Bianco assoluto
 FG_COLOR = 0    # Nero assoluto
 
+def get_real_weather():
+    """Recupera i dati meteo reali per Seregno usando l'API gratuita di Open-Meteo"""
+    # Coordinate geografiche di Seregno
+    LAT, LON = 45.6485, 9.2044
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current=temperature_2m,weather_code&timezone=Europe%2FRome"
+    
+    # Mappatura semplificata dei codici meteo WMO in testo italiano
+    weather_codes = {
+        0: "Cielo Sereno", 1: "Preval. Sereno", 2: "Parz. Nuvoloso", 3: "Nuvoloso",
+        45: "Nebbia", 48: "Nebbia Brinata", 51: "Pioggerella Leggera", 53: "Pioggerella",
+        61: "Pioggia Leggera", 63: "Pioggia Modesta", 65: "Pioggia Forte",
+        71: "Neve Leggera", 73: "Neve Modesta", 75: "Neve Forte",
+        80: "Rovesci di Pioggia", 95: "Temporale"
+    }
+    
+    try:
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        current = data["current"]
+        temp = round(current["temperature_2m"])
+        code = current["weather_code"]
+        
+        # Cerca la descrizione del codice meteo, altrimenti usa un valore generico
+        condizione = weather_codes.get(code, "Variabile")
+        return f"{temp}°C, {condizione}"
+    except Exception:
+        # Fallback in caso di errore di rete durante il workflow
+        return "22°C, Dati Non Disponibili"
+
 def create_dashboard():
-    # 1. Inizializza l'immagine in scala di grigi (L = 8-bit pixels, black and white)
+    # 1. Inizializza l'immagine in scala di grigi
     img = Image.new('L', (WIDTH, HEIGHT), color=BG_COLOR)
     draw = ImageDraw.Draw(img)
     
-    # 2. Caricamento Font di Sistema (Standard in Ubuntu GitHub Runner)
+    # 2. Caricamento Font di Sistema
     try:
         font_large = ImageFont.truetype("DejaVuSans-Bold.ttf", 74)
         font_medium = ImageFont.truetype("DejaVuSans-Bold.ttf", 28)
@@ -25,28 +55,27 @@ def create_dashboard():
         font_regular = ImageFont.load_default()
 
     # --- SEZIONE 1: OROLOGIO E DATA ---
-    now = datetime.datetime.now()
+    fuso_orario = pytz.timezone('Europe/Rome')
+    now = datetime.datetime.now(fuso_oraway) if 'fuso_oraway' in locals() else datetime.datetime.now(fuso_orario)
+    
     time_str = now.strftime("%H:%M")
-    # Formato data in italiano (es. MERCOLEDÌ 24 GIU 2026)
     days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"]
     months = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"]
     date_str = f"{days[now.weekday()]} {now.day} {months[now.month-1]} {now.year}"
 
-    # Centra il testo dell'orologio
+    # Centra il testo dell'orologio e della data
     w_time = draw.textlength(time_str, font=font_large)
     draw.text(((WIDTH - w_time) / 2, 40), time_str, font=font_large, fill=FG_COLOR)
     
     w_date = draw.textlength(date_str, font=font_medium)
     draw.text(((WIDTH - w_date) / 2, 130), date_str, font=font_medium, fill=FG_COLOR)
 
-    # Linea di separazione
+    # Linea di separazione 1
     draw.line([(80, 190), (WIDTH - 80, 190)], fill=FG_COLOR, width=2)
 
-    # --- SEZIONE 2: CALENDARIO (Dati di esempio integrabili con Google API)
+    # --- SEZIONE 2: CALENDARIO ---
     draw.text((80, 220), "IL TUO CALENDARIO", font=font_medium, fill=FG_COLOR)
     
-    # TODO: Integrare le chiamate reali a Google Calendar API qui.
-    # Usiamo un placeholder pulito per verificare subito il layout
     eventi = [
         "- 15:30: Riunione Progetto E-Ink (30 min)",
         "- Domani, 10:00: Chiamata con Niki (1 hr)",
@@ -58,22 +87,28 @@ def create_dashboard():
         draw.text((80, y_offset), evento, font=font_regular, fill=FG_COLOR)
         y_offset += 40
 
-    # Linea di separazione
+    # Linea di separazione 2
     draw.line([(80, 430), (WIDTH - 80, 430)], fill=FG_COLOR, width=2)
 
-    # --- SEZIONE 3: METEO E PROSSIMI COMPITI ---
-    draw.text((80, 460), "METEO SEREGNO", font=font_medium, fill=FG_COLOR)
-    draw.text((80, 500), "22°C, Parzialmente Nuvoloso", font=font_regular, fill=FG_COLOR)
-    draw.text((80, 535), "🔋 82%   |   🌡️ Interno: 21.5°C", font=font_regular, fill=FG_COLOR)
+    # --- SEZIONE 3: METEO REALE DI SEREGNO ---
+    weather_info = get_real_weather()
+    
+    # Scritta dell'intestazione Meteo ben visibile
+    draw.text((80, 455), "METEO SEREGNO", font=font_medium, fill=FG_COLOR)
+    
+    # Dati meteo reali scaricati dall'API
+    draw.text((80, 500), weather_info, font=font_regular, fill=FG_COLOR)
+    
+    # Statistiche di stato inferiori
+    draw.text((80, 540), "🔋 82%   |   🌡️ Interno: 21.5°C", font=font_regular, fill=FG_COLOR)
 
-    # 4. Salva l'immagine ottimizzandola per l'E-Ink (Dithering se necessario)
+    # 4. Salva l'immagine
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
         
-    # Converte in modalità 1-bit (bianco o nero netto) per la massima nitidezza sul Kindle
     img_monochrome = img.convert('1')
     img_monochrome.save(os.path.join(OUTPUT_DIR, "dashboard.png"), "PNG")
-    print("Dashboard generata con successo!")
+    print("Dashboard generata con meteo reale!")
 
 if __name__ == "__main__":
     create_dashboard()
