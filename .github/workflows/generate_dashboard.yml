@@ -2,8 +2,8 @@ name: Generate Kindle Dashboard
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # Gira ogni 30 minuti
-  workflow_dispatch: # Ti permette di avviarlo manualmente con un click da GitHub
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: Ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-python-version: '3.10'
+          python-version: '3.10'
           cache: 'pip'
 
       - name: Install Dependencies
@@ -30,12 +30,12 @@ jobs:
       - name: Run Generator Script
         env:
           GOOGLE_CALENDAR_ID: ${{ secrets.GOOGLE_CALENDAR_ID }}
-          # Inserisci qui le tue chiavi del meteo o credenziali come GitHub Secrets
         run: python generate.py
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./output # Lo script salverà l'immagine qui
-          force_orphan: true # Sovrascrive la cronologia mantenendo il file leggero ed evitando lag di aggiornamento
+          publish_dir: ./output
+          publish_branch: gh-pages
+          force_orphan: true
