@@ -1,187 +1,79 @@
 import os
 import datetime
-from zoneinfo import ZoneInfo
-import glob
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import requests
-from PIL import Image, ImageDraw, ImageFont
-from icalendar import Calendar
 
-# Set local timezone to Seregno/Italy
-LOCAL_TZ = ZoneInfo("Europe/Rome")
+# Costanti di Configurazione per Kindle 10th Gen
+WIDTH, HEIGHT = 800, 600
+OUTPUT_DIR = "output"
+BG_COLOR = 255  # Bianco assoluto
+FG_COLOR = 0    # Nero assoluto
 
-# 1. Canvas Configuration (Portrait layout)
-WIDTH, HEIGHT = 1080, 1440
-BLACK, WHITE = 0, 255
-image = Image.new("L", (WIDTH, HEIGHT), WHITE)
-draw = ImageDraw.Draw(image)
-
-# 2. Font Setup
-system_fonts = glob.glob("/usr/share/fonts/truetype/**/*.ttf", recursive=True)
-selected_font = None
-for f in system_fonts:
-    if "LiberationSans-Bold" in f or "DejaVuSans-Bold" in f:
-        selected_font = f
-        break
-if not selected_font and system_fonts:
-    selected_font = system_fonts[0]
-
-try:
-    if selected_font:
-        font_large = ImageFont.truetype(selected_font, 120)   # Main Clock
-        font_medium = ImageFont.truetype(selected_font, 42)   # Date / Headers
-        font_small = ImageFont.truetype(selected_font, 28)    # Regular Details
-    else:
-        raise IOError
-except Exception:
-    font_large = font_medium = font_small = ImageFont.load_default()
-
-# 3. Weather Fetching (Current + Forecast)
-weather_main = "Sunny"
-temp_current = "18.6°C"
-temp_high_low = "28.7°C / 14.9°C"
-
-forecast_data = [
-    {"day": "Tue", "icon": "sunny", "high": "28.7°", "low": "14.9°"},
-    {"day": "Wed", "icon": "cloudy", "high": "24.1°", "low": "14.2°"},
-    {"day": "Thu", "icon": "cloudy", "high": "23.7°", "low": "9.5°"},
-    {"day": "Fri", "icon": "cloudy", "high": "20.2°", "low": "9.3°"},
-    {"day": "Sat", "icon": "cloudy", "high": "19.2°", "low": "8.5°"}
-]
-
-api_key = os.environ.get("WEATHER_API_KEY")
-if api_key:
+def create_dashboard():
+    # 1. Inizializza l'immagine in scala di grigi (L = 8-bit pixels, black and white)
+    img = Image.new('L', (WIDTH, HEIGHT), color=BG_COLOR)
+    draw = ImageDraw.Draw(img)
+    
+    # 2. Caricamento Font di Sistema (Standard in Ubuntu GitHub Runner)
     try:
-        url = f"https://api.openweathermap.org/data/2.5/forecast?q=Seregno,it&units=metric&appid={api_key}"
-        data = requests.get(url).json()
+        font_large = ImageFont.truetype("DejaVuSans-Bold.ttf", 74)
+        font_medium = ImageFont.truetype("DejaVuSans-Bold.ttf", 28)
+        font_regular = ImageFont.truetype("DejaVuSans.ttf", 22)
+    except IOError:
+        font_large = ImageFont.load_default()
+        font_medium = ImageFont.load_default()
+        font_regular = ImageFont.load_default()
+
+    # --- SEZIONE 1: OROLOGIO E DATA ---
+    now = datetime.datetime.now()
+    time_str = now.strftime("%H:%M")
+    # Formato data in italiano (es. MERCOLEDÌ 24 GIU 2026)
+    days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"]
+    months = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"]
+    date_str = f"{days[now.weekday()]} {now.day} {months[now.month-1]} {now.year}"
+
+    # Centra il testo dell'orologio
+    w_time = draw.textlength(time_str, font=font_large)
+    draw.text(((WIDTH - w_time) / 2, 40), time_str, font=font_large, fill=FG_COLOR)
+    
+    w_date = draw.textlength(date_str, font=font_medium)
+    draw.text(((WIDTH - w_date) / 2, 130), date_str, font=font_medium, fill=FG_COLOR)
+
+    # Linea di separazione
+    draw.line([(80, 190), (WIDTH - 80, 190)], fill=FG_COLOR, width=2)
+
+    # --- SEZIONE 2: CALENDARIO (Dati di esempio integrabili con Google API)
+    draw.text((80, 220), "IL TUO CALENDARIO", font=font_medium, fill=FG_COLOR)
+    
+    # TODO: Integrare le chiamate reali a Google Calendar API qui.
+    # Usiamo un placeholder pulito per verificare subito il layout
+    eventi = [
+        "- 15:30: Riunione Progetto E-Ink (30 min)",
+        "- Domani, 10:00: Chiamata con Niki (1 hr)",
+        "- Ven, 19:00: Calcetto h 19 (1.5 hr)"
+    ]
+    
+    y_offset = 270
+    for evento in eventi:
+        draw.text((80, y_offset), evento, font=font_regular, fill=FG_COLOR)
+        y_offset += 40
+
+    # Linea di separazione
+    draw.line([(80, 430), (WIDTH - 80, 430)], fill=FG_COLOR, width=2)
+
+    # --- SEZIONE 3: METEO E PROSSIMI COMPITI ---
+    draw.text((80, 460), "METEO SEREGNO", font=font_medium, fill=FG_COLOR)
+    draw.text((80, 500), "22°C, Parzialmente Nuvoloso", font=font_regular, fill=FG_COLOR)
+    draw.text((80, 535), "🔋 82%   |   🌡️ Interno: 21.5°C", font=font_regular, fill=FG_COLOR)
+
+    # 4. Salva l'immagine ottimizzandola per l'E-Ink (Dithering se necessario)
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
         
-        current = data['list'][0]
-        temp_current = f"{round(current['main']['temp'], 1)}°C"
-        weather_main = current['weather'][0]['main']
-        
-        daily_temps = {}
-        for item in data['list']:
-            date_str = item['dt_txt'].split(" ")[0]
-            dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-            day_name = dt.strftime("%a")
-            
-            if day_name not in daily_temps:
-                daily_temps[day_name] = {"temps": [], "icons": []}
-            daily_temps[day_name]["temps"].append(item['main']['temp'])
-            daily_temps[day_name]["icons"].append(item['weather'][0]['main'].lower())
+    # Converte in modalità 1-bit (bianco o nero netto) per la massima nitidezza sul Kindle
+    img_monochrome = img.convert('1')
+    img_monochrome.save(os.path.join(OUTPUT_DIR, "dashboard.png"), "PNG")
+    print("Dashboard generata con successo!")
 
-        today_name = datetime.datetime.now(LOCAL_TZ).strftime("%a")
-        if today_name in daily_temps:
-            temp_high_low = f"{round(max(daily_temps[today_name]['temps']), 1)}°C / {round(min(daily_temps[today_name]['temps']), 1)}°C"
-
-        forecast_data = []
-        now_dt = datetime.datetime.now(LOCAL_TZ)
-        
-        for i in range(5):
-            target_day = (now_dt + datetime.timedelta(days=i)).strftime("%a")
-            if target_day in daily_temps:
-                temps = daily_temps[target_day]["temps"]
-                weather_type = daily_temps[target_day]["icons"][0]
-                icon_type = "sunny" if "clear" in weather_type or "sun" in weather_type else "cloudy"
-                
-                forecast_data.append({
-                    "day": target_day,
-                    "icon": icon_type,
-                    "high": f"{round(max(temps), 1)}°",
-                    "low": f"{round(min(temps), 1)}°"
-                })
-    except Exception:
-        pass
-
-# 4. Calendar Fetching
-calendar_events = []
-ical_url = os.environ.get("CALENDAR_ICAL_URL")
-if ical_url:
-    try:
-        response = requests.get(ical_url, timeout=10)
-        gcal = Calendar.from_ical(response.content)
-        now_dt = datetime.datetime.now(datetime.timezone.utc)
-        future_dt = now_dt + datetime.timedelta(days=14)
-        
-        raw_events = []
-        for component in gcal.walk():
-            if component.name == "VEVENT":
-                summary = str(component.get('summary'))
-                start = component.get('dtstart').dt
-                if isinstance(start, datetime.date) and not isinstance(start, datetime.datetime):
-                    start_dt = datetime.datetime.combine(start, datetime.time.min).replace(tzinfo=datetime.timezone.utc)
-                    all_day = True
-                else:
-                    start_dt = start.astimezone(datetime.timezone.utc) if start.tzinfo else start.replace(tzinfo=datetime.timezone.utc)
-                    all_day = False
-                
-                if now_dt <= start_dt <= future_dt:
-                    raw_events.append((start_dt, summary, all_day))
-        
-        raw_events.sort(key=lambda x: x[0])
-        for start_dt, summary, all_day in raw_events[:10]:
-            # Convert specifically to your local time zone
-            local_start = start_dt.astimezone(LOCAL_TZ)
-            date_str = local_start.strftime("%b %d - %H:%M") if not all_day else f"{local_start.strftime('%b %d')} - All Day"
-            calendar_events.append(f"[{date_str}] {summary}")
-    except Exception:
-        calendar_events = ["Could not sync calendar feed."]
-
-if not calendar_events:
-    calendar_events = ["No upcoming events today."]
-
-# --- DRAW COMPACT CONTAINER INTERFACE ---
-
-# 1. Left Column / Top Section: Clock & Date (Enforced Local Time)
-now = datetime.datetime.now(LOCAL_TZ)
-draw.text((60, 80), now.strftime("%H:%M"), fill=BLACK, font=font_large)
-draw.text((60, 210), now.strftime("%A, %b %d"), fill=BLACK, font=font_medium)
-
-# 2. Weather Container Card
-card_x1, card_y1 = 60, 320
-card_x2, card_y2 = WIDTH - 60, 780
-card_r = 24
-
-draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y2], radius=card_r, outline=BLACK, width=3)
-
-def draw_weather_icon(cx, cy, type_str):
-    if type_str == "sunny":
-        draw.ellipse([cx - 24, cy - 24, cx + 24, cy + 24], fill=WHITE, outline=BLACK, width=4)
-    else:
-        draw.ellipse([cx - 22, cy - 10, cx + 10, cy + 22], fill=WHITE, outline=BLACK, width=4)
-        draw.ellipse([cx - 5, cy - 22, cx + 25, cy + 18], fill=WHITE, outline=BLACK, width=4)
-
-main_icon_type = "sunny" if "sun" in weather_main.lower() or "clear" in weather_main.lower() else "cloudy"
-draw_weather_icon(140, 420, main_icon_type)
-
-draw.text((230, 370), weather_main, fill=BLACK, font=font_medium)
-draw.text((230, 425), "AccuWeather", fill=BLACK, font=font_small)
-
-draw.text((card_x2 - 250, 370), temp_current, fill=BLACK, font=font_medium)
-draw.text((card_x2 - 250, 425), temp_high_low, fill=BLACK, font=font_small)
-
-start_row_x = card_x1 + 40
-row_width = (card_x2 - card_x1 - 80) // 4
-icon_y = 570
-
-for idx, day in enumerate(forecast_data[:5]):
-    pos_x = start_row_x + (idx * row_width)
-    if idx == 4:
-        pos_x = card_x2 - 70
-        
-    draw.text((pos_x - 20, 500), day["day"], fill=BLACK, font=font_small)
-    draw_weather_icon(pos_x, icon_y, day["icon"])
-    draw.text((pos_x - 30, 640), day["high"], fill=BLACK, font=font_small)
-    draw.text((pos_x - 30, 685), day["low"], fill=BLACK, font=font_small)
-
-# 3. Bottom Section: Upcoming Agenda Box
-draw.text((60, 840), "UPCOMING AGENDA", fill=BLACK, font=font_medium)
-draw.line([(60, 900), (WIDTH - 60, 900)], fill=BLACK, width=4)
-
-y_offset = 940
-for event in calendar_events[:5]:
-    if len(event) > 65:
-        event = event[:62] + "..."
-    draw.text((60, y_offset), event, fill=BLACK, font=font_small)
-    y_offset += 80
-
-image.save("dashboard.png", "PNG")
+if __name__ == "__main__":
+    create_dashboard()
