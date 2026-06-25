@@ -51,7 +51,7 @@ def create_dashboard():
 
     # --- SEZIONE 1: OROLOGIO E DATA CON FUSO ORARIO ITALIANO ---
     fuso_orario = pytz.timezone('Europe/Rome')
-    now = datetime.datetime.now(fuso_orario) # Corretto l'errore di battitura qui
+    now = datetime.datetime.now(fuso_orario)
     
     time_str = now.strftime("%H:%M")
     days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"]
@@ -68,7 +68,7 @@ def create_dashboard():
     # Linea di separazione 1
     draw.line([(80, 190), (WIDTH - 80, 190)], fill=FG_COLOR, width=2)
 
-    # --- SEZIONE 2: CALENDARIO ---
+    # --- SEZIONE 2: CALENDARIO (Testo fisso temporaneo) ---
     draw.text((80, 220), "IL TUO CALENDARIO", font=font_medium, fill=FG_COLOR)
     
     eventi = [
@@ -90,15 +90,17 @@ def create_dashboard():
     
     draw.text((80, 455), "METEO SEREGNO", font=font_medium, fill=FG_COLOR)
     draw.text((80, 500), weather_info, font=font_regular, fill=FG_COLOR)
-    draw.text((80, 540), "🔋 82%   |   🌡️ Interno: 21.5°C", font=font_regular, fill=FG_COLOR)
+    draw.text((80, 540), "🔋 82%   |   Temp. Esterna", font=font_regular, fill=FG_COLOR)
 
-    # 4. Salva l'immagine
+    # 4. Salva l'immagine nella cartella corretta
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
         
     img_monochrome = img.convert('1')
     img_monochrome.save(os.path.join(OUTPUT_DIR, "dashboard.png"), "PNG")
-    print("Dashboard generata con successo!")
+    
+    # Questo print ti confermerà l'esito esatto dentro GitHub Actions
+    print(f"Dashboard generata con successo alle ore: {time_str} del {date_str}")
 
 if __name__ == "__main__":
     create_dashboard()
