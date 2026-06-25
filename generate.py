@@ -7,17 +7,14 @@ import pytz
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
-# Costanti di Configurazione per Kindle 10th Gen
 WIDTH, HEIGHT = 800, 600
 OUTPUT_DIR = "output"
-BG_COLOR = 255  # Bianco assoluto
-FG_COLOR = 0    # Nero assoluto
+BG_COLOR = 255
+FG_COLOR = 0
 
 def get_real_weather():
-    """Recupera i dati meteo reali per Seregno usando l'API gratuita di Open-Meteo"""
     LAT, LON = 45.6485, 9.2044
     url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current=temperature_2m,weather_code&timezone=Europe%2FRome"
-    
     weather_codes = {
         0: "Cielo Sereno", 1: "Preval. Sereno", 2: "Parz. Nuvoloso", 3: "Nuvoloso",
         45: "Nebbia", 48: "Nebbia Brinata", 51: "Pioggerella Leggera", 53: "Pioggerella",
@@ -25,7 +22,6 @@ def get_real_weather():
         71: "Neve Leggera", 73: "Neve Modesta", 75: "Neve Forte",
         80: "Rovesci di Pioggia", 95: "Temporale"
     }
-    
     try:
         response = requests.get(url, timeout=10)
         data = response.json()
@@ -38,7 +34,6 @@ def get_real_weather():
         return "Dati Non Disponibili"
 
 def get_google_calendar_events():
-    """Scarica i prossimi 3 eventi reali da Google Calendar usando il Service Account"""
     calendar_id = os.environ.get("CALENDAR_URL")
     creds_json = os.environ.get("GOOGLE_CALENDAR_CREDENTIALS")
     
@@ -81,4 +76,72 @@ def get_google_calendar_events():
             start_date = datetime.date.fromisoformat(start)
             time_str = f"{start_date.strftime('%d/%m')} (Tutto il giorno)"
             
-        formatted_events.append(f"- {time_str}: {
+        # Riga incriminata corretta senza formattazioni strane
+        formatted_events.append(f"- {time_str}: {summary}")
+        
+    return formatted_events
+
+def create_dashboard():
+    img = Image.new('L', (WIDTH, HEIGHT), color=BG_COLOR)
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        font_large = ImageFont.truetype("DejaVuSans-Bold.ttf", 74)
+        font_medium = ImageFont.truetype("DejaVuSans-Bold.ttf", 28)
+        font_regular = ImageFont.truetype("DejaVuSans.ttf", 22)
+    except IOError:
+        font_large = ImageFont.load_default()
+        font_medium = ImageFont.load_default()
+        font_regular = ImageFont.load_default()
+
+    fuso_orario = pytz.timezone('Europe/Rome')
+    now = datetime.datetime.now(fuso_orario)
+    
+    time_str = now.strftime("%H:%M")
+    days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"]
+    months = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"]
+    date_str = f"{days[now.weekday()]} {now.day} {months[now.month-1]} {now.year}"
+
+    w_time = draw.textlength(time_str, font=font_large)
+    draw.text(((WIDTH - w_time) / 2, 40), time_str, font=font_large, fill=FG_COLOR)
+    
+    w_date = draw.textlength(date_str, font=font_medium)
+    draw.text(((WIDTH - w_date) / 2, 130), date_str, font=font_medium, fill=FG_COLOR)
+
+    draw.line([(80, 190), (WIDTH - 80, 190)], fill=FG_COLOR, width=2)
+
+    draw.text((80, 220), "IL TUO CALENDARIO", font=font_medium, fill=FG_COLOR)
+    
+    try:
+        eventi = get_google_calendar_events()
+    except Exception as e:
+        error_msg = str(e).replace('\n', ' ').strip()
+        if "HttpError" in error_msg or "API" in error_msg:
+            eventi = [f"- Errore Google: {error_msg[:45]}..."]
+        else:
+            eventi = [f"- Errore: {error_msg[:50]}"]
+    
+    y_offset = 270
+    for evento in eventi:
+        if len(evento) > 55:
+            evento = evento[:52] + "..."
+        draw.text((80, y_offset), evento, font=font_regular, fill=FG_COLOR)
+        y_offset += 40
+
+    draw.line([(80, 430), (WIDTH - 80, 430)], fill=FG_COLOR, width=2)
+
+    weather_info = get_real_weather()
+    draw.text((80, 455), "METEO SEREGNO", font=font_medium, fill=FG_COLOR)
+    draw.text((80, 500), weather_info, font=font_regular, fill=FG_COLOR)
+    draw.text((80, 540), "🔋 82%   |   Temp. Esterna", font=font_regular, fill=FG_COLOR)
+
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+        
+    img_monochrome = img.convert('1')
+    img_monochrome.save(os.path.join(OUTPUT_DIR, "dashboard.png"), "PNG")
+    
+    print(f"Dashboard generata con successo alle ore: {time_str} del {date_str}")
+
+if __name__ == "__main__":
+    create_dashboard()
