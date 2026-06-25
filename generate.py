@@ -121,11 +121,10 @@ def create_dashboard():
     # --- SEZIONE 2: VERO CALENDARIO GOOGLE ---
     draw.text((80, 220), "IL TUO CALENDARIO", font=font_medium, fill=FG_COLOR)
     
-    try:
+  try:
         eventi = get_google_calendar_events()
     except Exception as e:
-        print(f"Errore generale: {e}")
-        eventi = ["- Impossibile leggere il calendario"]
+        eventi = [f"- Errore: {str(e)[:40]}"]
     
     y_offset = 270
     for evento in eventi:
