@@ -68,10 +68,3 @@ def get_google_calendar_events():
         
         if not events:
             return ["Nessun impegno in programma"]
-        
-        formatted_events = []
-        fuso_orario = pytz.timezone('Europe/Rome')
-        
-        for event in events:
-            summary = event.get('summary', 'Impegno senza titolo')
-            start = event['start'].get('dateTime', event['start'].get('date'))
