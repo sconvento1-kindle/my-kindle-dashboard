@@ -39,7 +39,7 @@ def get_real_weather():
 
 def get_google_calendar_events():
     """Scarica i prossimi 3 eventi reali da Google Calendar usando il Service Account"""
-    calendar_id = os.environ.get("GOOGLE_CALENDAR_ID")
+    calendar_id = os.environ.get("CALENDAR_URL")
     creds_json = os.environ.get("GOOGLE_CALENDAR_CREDENTIALS")
     
     if not calendar_id or not creds_json:
