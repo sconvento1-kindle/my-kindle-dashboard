@@ -63,4 +63,40 @@ def get_google_calendar_events():
     
     for event in events:
         summary = event.get('summary', 'Impegno senza titolo')
-        start = event['start'].get('dateTime', event['start'].
+        start = event['start'].get('dateTime', event['start'].get('date'))
+        
+        if 'T' in start:
+            start_dt = datetime.datetime.fromisoformat(start.replace('Z', '+00:00')).astimezone(fuso_orario)
+            oggi = datetime.datetime.now(fuso_orario).date()
+            if start_dt.date() == oggi:
+                time_str = f"Oggi, {start_dt.strftime('%H:%M')}"
+            else:
+                time_str = start_dt.strftime('%d/%m %H:%M')
+        else:
+            start_date = datetime.date.fromisoformat(start)
+            time_str = f"{start_date.strftime('%d/%m')} (Tutto il giorno)"
+            
+        formatted_events.append(f"- {time_str}: {summary}")
+        
+    return formatted_events
+
+def create_dashboard():
+    # Crea l'immagine in scala di grigi nativa (8-bit)
+    img = Image.new('L', (WIDTH, HEIGHT), color=BG_COLOR)
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        font_large = ImageFont.truetype("DejaVuSans-Bold.ttf", 74)
+        font_medium = ImageFont.truetype("DejaVuSans-Bold.ttf", 28)
+        font_regular = ImageFont.truetype("DejaVuSans.ttf", 22)
+    except IOError:
+        font_large = ImageFont.load_default()
+        font_medium = ImageFont.load_default()
+        font_regular = ImageFont.load_default()
+
+    fuso_orario = pytz.timezone('Europe/Rome')
+    now = datetime.datetime.now(fuso_orario)
+    
+    time_str = now.strftime("%H:%M")
+    days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"]
+    months =
