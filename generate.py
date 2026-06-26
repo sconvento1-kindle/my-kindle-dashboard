@@ -33,6 +33,7 @@ PROFILES = {
         "quote_box_height": 90,
         "font_quote_size": 13,
         "font_quote_song_size": 10,
+        "quote_line_step": 20,
         "last_update_y": 570,
         "max_event_len": 45
     },
@@ -59,6 +60,7 @@ PROFILES = {
         "quote_box_height": 210,
         "font_quote_size": 24,
         "font_quote_song_size": 18,
+        "quote_line_step": 40,
         "last_update_y": 1360,
         "max_event_len": 50
     }
