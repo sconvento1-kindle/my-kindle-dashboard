@@ -41,19 +41,19 @@ PROFILES = {
         "font_regular_size": 26,
         "font_small_size": 20,
         "margin_x": 80,
-        "header_y": 60,
-        "date_y": 130,
-        "line1_y": 180,
-        "curr_weather_y": 200,
+        "header_y": 70,
+        "date_y": 145,
+        "line1_y": 210,
+        "curr_weather_y": 230,
         "curr_weather_icon_size": 120,
-        "forecast_y": 370,
+        "forecast_y": 400,
         "forecast_icon_size": 100,
-        "line2_y": 590,
-        "cal_title_y": 620,
-        "events_start_y": 690,
+        "line2_y": 620,
+        "cal_title_y": 650,
+        "events_start_y": 720,
         "event_step": 85,
-        "line3_y": 1250,
-        "last_update_y": 1320,
+        "line3_y": 1280,
+        "last_update_y": 1350,
         "max_event_len": 50
     }
 }
@@ -86,29 +86,29 @@ FG_COLOR = 0
 
 # Helper to draw weather icons
 def draw_sun(draw, cx, cy, r):
-    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=FG_COLOR, width=3*SCALE)
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=FG_COLOR, width=4*SCALE)
     for i in range(8):
         angle = math.radians(i * 45)
-        x1 = cx + int((r + 4*SCALE) * math.cos(angle))
-        y1 = cy + int((r + 4*SCALE) * math.sin(angle))
-        x2 = cx + int((r + 12*SCALE) * math.cos(angle))
-        y2 = cy + int((r + 12*SCALE) * math.sin(angle))
-        draw.line([(x1, y1), (x2, y2)], fill=FG_COLOR, width=3*SCALE)
+        x1 = cx + int((r + r*0.15) * math.cos(angle))
+        y1 = cy + int((r + r*0.15) * math.sin(angle))
+        x2 = cx + int((r + r*0.5) * math.cos(angle))
+        y2 = cy + int((r + r*0.5) * math.sin(angle))
+        draw.line([(x1, y1), (x2, y2)], fill=FG_COLOR, width=4*SCALE)
 
 def draw_cloud(draw, cx, cy, r):
     # Left circle
-    draw.ellipse([cx - r, cy - r*0.2, cx - r*0.2, cy + r*0.6], fill=BG_COLOR, outline=FG_COLOR, width=3*SCALE)
+    draw.ellipse([cx - r, cy - r*0.2, cx - r*0.2, cy + r*0.6], fill=BG_COLOR, outline=FG_COLOR, width=4*SCALE)
     # Right circle
-    draw.ellipse([cx + r*0.2, cy - r*0.1, cx + r, cy + r*0.5], fill=BG_COLOR, outline=FG_COLOR, width=3*SCALE)
+    draw.ellipse([cx + r*0.2, cy - r*0.1, cx + r, cy + r*0.5], fill=BG_COLOR, outline=FG_COLOR, width=4*SCALE)
     # Center circle
-    draw.ellipse([cx - r*0.6, cy - r*0.7, cx + r*0.6, cy + r*0.5], fill=BG_COLOR, outline=FG_COLOR, width=3*SCALE)
+    draw.ellipse([cx - r*0.6, cy - r*0.7, cx + r*0.6, cy + r*0.5], fill=BG_COLOR, outline=FG_COLOR, width=4*SCALE)
     # Erase inner lines
     draw.ellipse([cx - r*0.5, cy - r*0.6, cx + r*0.5, cy + r*0.4], fill=BG_COLOR)
     draw.ellipse([cx - r*0.9, cy - r*0.1, cx - r*0.3, cy + r*0.5], fill=BG_COLOR)
     draw.ellipse([cx + r*0.3, cy, cx + r*0.9, cy + r*0.4], fill=BG_COLOR)
     draw.rectangle([cx - r*0.6, cy, cx + r*0.6, cy + r*0.5], fill=BG_COLOR)
     # Draw bottom flat line
-    draw.line([(cx - r, cy + r*0.5), (cx + r, cy + r*0.5)], fill=FG_COLOR, width=3*SCALE)
+    draw.line([(cx - r, cy + r*0.5), (cx + r, cy + r*0.5)], fill=FG_COLOR, width=4*SCALE)
 
 def draw_sun_behind_cloud(draw, cx, cy, r):
     # Sun shifted top-right, slightly smaller
@@ -127,9 +127,9 @@ def draw_rain(draw, cx, cy, r):
     # Rain drops
     y_start = cy + r*0.4
     y_end = cy + r*0.8
-    draw.line([(cx - r*0.4, y_start), (cx - r*0.5, y_end)], fill=FG_COLOR, width=3*SCALE)
-    draw.line([(cx, y_start), (cx - r*0.1, y_end)], fill=FG_COLOR, width=3*SCALE)
-    draw.line([(cx + r*0.4, y_start), (cx + r*0.3, y_end)], fill=FG_COLOR, width=3*SCALE)
+    draw.line([(cx - r*0.4, y_start), (cx - r*0.5, y_end)], fill=FG_COLOR, width=4*SCALE)
+    draw.line([(cx, y_start), (cx - r*0.1, y_end)], fill=FG_COLOR, width=4*SCALE)
+    draw.line([(cx + r*0.4, y_start), (cx + r*0.3, y_end)], fill=FG_COLOR, width=4*SCALE)
 
 def draw_thunder(draw, cx, cy, r):
     draw_cloud(draw, cx, cy - r*0.2, r)
@@ -137,9 +137,9 @@ def draw_thunder(draw, cx, cy, r):
     y1 = cy + r*0.3
     y2 = cy + r*0.6
     y3 = cy + r*1.0
-    draw.line([(cx, y1), (cx - r*0.3, y2)], fill=FG_COLOR, width=3*SCALE)
-    draw.line([(cx - r*0.3, y2), (cx + r*0.2, y2)], fill=FG_COLOR, width=3*SCALE)
-    draw.line([(cx + r*0.2, y2), (cx - r*0.1, y3)], fill=FG_COLOR, width=3*SCALE)
+    draw.line([(cx, y1), (cx - r*0.3, y2)], fill=FG_COLOR, width=4*SCALE)
+    draw.line([(cx - r*0.3, y2), (cx + r*0.2, y2)], fill=FG_COLOR, width=4*SCALE)
+    draw.line([(cx + r*0.2, y2), (cx - r*0.1, y3)], fill=FG_COLOR, width=4*SCALE)
 
 def draw_snow(draw, cx, cy, r):
     draw_cloud(draw, cx, cy - r*0.2, r)
@@ -151,9 +151,9 @@ def draw_snow(draw, cx, cy, r):
     draw.ellipse([cx + r*0.5 - dot_r, y - dot_r, cx + r*0.5 + dot_r, y + dot_r], fill=FG_COLOR)
 
 def draw_fog(draw, cx, cy, r):
-    draw.line([(cx - r, cy - r*0.4), (cx + r, cy - r*0.4)], fill=FG_COLOR, width=3*SCALE)
-    draw.line([(cx - r*0.8, cy), (cx + r*0.8, cy)], fill=FG_COLOR, width=3*SCALE)
-    draw.line([(cx - r, cy + r*0.4), (cx + r, cy + r*0.4)], fill=FG_COLOR, width=3*SCALE)
+    draw.line([(cx - r, cy - r*0.4), (cx + r, cy - r*0.4)], fill=FG_COLOR, width=4*SCALE)
+    draw.line([(cx - r*0.8, cy), (cx + r*0.8, cy)], fill=FG_COLOR, width=4*SCALE)
+    draw.line([(cx - r, cy + r*0.4), (cx + r, cy + r*0.4)], fill=FG_COLOR, width=4*SCALE)
 
 def draw_weather_icon(draw, code, x, y, size):
     cx = x + size // 2
@@ -312,7 +312,6 @@ def get_google_calendar_events():
     return formatted_events
 
 def create_dashboard():
-    # Create high-res image for super-sampling
     img = Image.new('L', (WIDTH, HEIGHT), color=BG_COLOR)
     draw = ImageDraw.Draw(img)
     
@@ -377,18 +376,11 @@ def create_dashboard():
         details_str = f"Umidità: {weather['current_humidity']}%  |  Vento: {weather['current_wind']} km/h"
         draw.text((text_x, curr_y + 80 * SCALE), details_str, font=font_small, fill=FG_COLOR)
         
-        # Right: Large Temp & Today's Min/Max
+        # Right: Large Temp (No min/max below it)
         temp_str = f"{weather['current_temp']}°"
         w_temp = draw.textlength(temp_str, font=font_temp_large)
         temp_x = WIDTH - cfg["margin_x"] - w_temp
-        draw.text((temp_x, curr_y - 10 * SCALE), temp_str, font=font_temp_large, fill=FG_COLOR)
-        
-        # Min/Max below temp
-        today_fc = weather["forecast"][0]
-        minmax_str = f"{today_fc['temp_max']}° / {today_fc['temp_min']}°"
-        w_minmax = draw.textlength(minmax_str, font=font_regular)
-        minmax_x = WIDTH - cfg["margin_x"] - w_minmax
-        draw.text((minmax_x, curr_y + 80 * SCALE), minmax_str, font=font_regular, fill=FG_COLOR)
+        draw.text((temp_x, curr_y + 10 * SCALE), temp_str, font=font_temp_large, fill=FG_COLOR)
 
     # 3. Weather Section (Weekly Forecast)
     if weather:
@@ -412,54 +404,4 @@ def create_dashboard():
             # Temp Max / Min
             temp_str = f"{fc['temp_max']}° / {fc['temp_min']}°"
             w_temp = draw.textlength(temp_str, font=font_small)
-            draw.text((cx - w_temp / 2, icon_y + icon_size + 15 * SCALE), temp_str, font=font_bold_small, fill=FG_COLOR)
-            
-            # Vertical separator
-            if i > 0:
-                draw.line([(col_x, y_forecast), (col_x, y_forecast + icon_size + 70 * SCALE)], fill=FG_COLOR, width=1*SCALE)
-    else:
-        draw.text((cfg["margin_x"], cfg["forecast_y"]), "Dati Meteo Non Disponibili", font=font_regular, fill=FG_COLOR)
-
-    # Linea 2
-    draw.line([(cfg["margin_x"], cfg["line2_y"]), (WIDTH - cfg["margin_x"], cfg["line2_y"])], fill=FG_COLOR, width=2*SCALE)
-
-    # 4. Calendar Section
-    draw.text((cfg["margin_x"], cfg["cal_title_y"]), "I PROSSIMI IMPEGNI", font=font_medium, fill=FG_COLOR)
-    
-    try:
-        eventi = get_google_calendar_events()
-    except Exception as e:
-        error_msg = str(e).replace('\n', ' ').strip()
-        eventi = [f"- Errore Calendario: {error_msg[:45]}..."]
-    
-    y_offset = cfg["events_start_y"]
-    for evento in eventi:
-        if len(evento) > cfg["max_event_len"]:
-            evento = evento[:cfg["max_event_len"]-3] + "..."
-        draw.text((cfg["margin_x"], y_offset), evento, font=font_regular, fill=FG_COLOR)
-        y_offset += cfg["event_step"]
-
-    # Linea 3
-    draw.line([(cfg["margin_x"], cfg["line3_y"]), (WIDTH - cfg["margin_x"], cfg["line3_y"])], fill=FG_COLOR, width=1*SCALE)
-
-    # Footer: Info Ultimo Aggiornamento
-    time_str = now.strftime("%H:%M")
-    date_update_str = now.strftime("%d/%m")
-    footer_str = f"Ultimo aggiornamento: {date_update_str} alle {time_str}"
-    w_footer = draw.textlength(footer_str, font=font_small)
-    draw.text(((WIDTH - w_footer) / 2, cfg["last_update_y"]), footer_str, font=font_small, fill=FG_COLOR)
-
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-        
-    # Resize high-res image back to target resolution with Lanczos filter
-    img_grayscale = img.convert('L')
-    img_grayscale.putpixel((0, 0), 250)
-    
-    img_resized = img_grayscale.resize((TARGET_WIDTH, TARGET_HEIGHT), Image.Resampling.LANCZOS)
-    img_resized.save(os.path.join(OUTPUT_DIR, "dashboard.png"), "PNG")
-    
-    print(f"Dashboard generata con successo alle ore: {time_str} del {date_str}")
-
-if __name__ == "__main__":
-    create_dashboard()
+            draw.text((cx - w_temp / 2, icon_y + icon_size + 15 * SCALE
