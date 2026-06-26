@@ -99,4 +99,57 @@ def create_dashboard():
     
     time_str = now.strftime("%H:%M")
     days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"]
-    months =
+    months = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"]
+    date_str = f"{days[now.weekday()]} {now.day} {months[now.month-1]} {now.year}"
+
+    w_time = draw.textlength(time_str, font=font_large)
+    draw.text(((WIDTH - w_time) / 2, 40), time_str, font=font_large, fill=FG_COLOR)
+    
+    w_date = draw.textlength(date_str, font=font_medium)
+    draw.text(((WIDTH - w_date) / 2, 130), date_str, font=font_medium, fill=FG_COLOR)
+
+    draw.line([(80, 190), (WIDTH - 80, 190)], fill=FG_COLOR, width=2)
+
+    draw.text((80, 220), "IL TUO CALENDARIO", font=font_medium, fill=FG_COLOR)
+    
+    try:
+        eventi = get_google_calendar_events()
+    except Exception as e:
+        error_msg = str(e).replace('\n', ' ').strip()
+        if "HttpError" in error_msg or "API" in error_msg:
+            eventi = [f"- Errore Google: {error_msg[:45]}..."]
+        else:
+            eventi = [f"- Errore: {error_msg[:50]}"]
+    
+    y_offset = 270
+    for evento in eventi:
+        if len(evento) > 55:
+            evento = evento[:52] + "..."
+        draw.text((80, y_offset), evento, font=font_regular, fill=FG_COLOR)
+        y_offset += 40
+
+    draw.line([(80, 430), (WIDTH - 80, 430)], fill=FG_COLOR, width=2)
+
+    weather_info = get_real_weather()
+    draw.text((80, 455), "METEO SEREGNO", font=font_medium, fill=FG_COLOR)
+    draw.text((80, 500), weather_info, font=font_regular, fill=FG_COLOR)
+    draw.text((80, 540), "🔋 82%   |   Temp. Esterna", font=font_regular, fill=FG_COLOR)
+
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+        
+    # Forza la conversione in scala di grigi 'L' (8-bit)
+    img_grayscale = img.convert('L')
+    
+    # TRUCCO FONDAMENTALE: Coloriamo il primissimo pixel (0,0) in alto a sinistra 
+    # con un grigio quasi invisibile (250 invece di 255 bianco).
+    # Questo costringe Pillow a salvare una PNG a 8-bit REALI, disattivando l'ottimizzazione a 1-bit.
+    img_grayscale.putpixel((0, 0), 250)
+    
+    # Salviamo in formato PNG originale
+    img_grayscale.save(os.path.join(OUTPUT_DIR, "dashboard.png"), "PNG")
+    
+    print(f"Dashboard generata con successo alle ore: {time_str} del {date_str}")
+
+if __name__ == "__main__":
+    create_dashboard()
