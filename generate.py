@@ -1,6 +1,7 @@
 import os
 import datetime
 import json
+import math
 from PIL import Image, ImageDraw, ImageFont
 import requests
 import pytz
@@ -12,69 +13,48 @@ PROFILES = {
     "KINDLE_BASIC": {
         "width": 800,
         "height": 600,
-        "font_large_size": 48,
-        "font_medium_size": 24,
-        "font_regular_size": 18,
-        "font_small_size": 14,
-        "margin_x": 50,
-        "date_y": 30,
-        "line1_y": 100,
-        "cal_title_y": 120,
-        "events_start_y": 160,
-        "event_step": 35,
-        "line2_y": 380,
-        "weather_title_y": 400,
-        "weather_temp_y": 440,
-        "weather_details_y": 500,
-        "forecast_y": 530,
-        "last_update_y": 575,
-        "max_event_len": 45
+        "font_header_size": 40,
+        "font_medium_size": 22,
+        "font_regular_size": 16,
+        "font_small_size": 12,
+        "margin_x": 40,
+        "header_y": 20,
+        "date_y": 70,
+        "line1_y": 110,
+        "weather_title_y": 130,
+        "forecast_y": 170,
+        "line2_y": 330,
+        "cal_title_y": 350,
+        "events_start_y": 390,
+        "event_step": 32,
+        "last_update_y": 570,
+        "max_event_len": 45,
+        "weather_icon_size": 50
     },
     "KINDLE_PW4_PORTRAIT": {
         "width": 1072,
         "height": 1448,
-        "font_large_size": 80,
-        "font_medium_size": 38,
-        "font_regular_size": 28,
-        "font_small_size": 22,
+        "font_header_size": 60,
+        "font_medium_size": 35,
+        "font_regular_size": 26,
+        "font_small_size": 20,
         "margin_x": 80,
-        "date_y": 60,
+        "header_y": 60,
+        "date_y": 140,
         "line1_y": 210,
-        "cal_title_y": 250,
-        "events_start_y": 320,
-        "event_step": 75,
-        "line2_y": 780,
-        "weather_title_y": 820,
-        "weather_temp_y": 880,
-        "weather_details_y": 1000,
-        "forecast_y": 1120,
-        "last_update_y": 1380,
-        "max_event_len": 50
-    },
-    "KINDLE_PW4_LANDSCAPE": {
-        "width": 1448,
-        "height": 1072,
-        "font_large_size": 80,
-        "font_medium_size": 38,
-        "font_regular_size": 28,
-        "font_small_size": 22,
-        "margin_x": 144,
-        "date_y": 60,
-        "line1_y": 160,
-        "cal_title_y": 190,
-        "events_start_y": 250,
-        "event_step": 70,
-        "line2_y": 680,
-        "weather_title_y": 710,
-        "weather_temp_y": 760,
-        "weather_details_y": 880,
-        "forecast_y": 950,
-        "last_update_y": 1030,
-        "max_event_len": 70
+        "weather_title_y": 240,
+        "forecast_y": 300,
+        "line2_y": 580,
+        "cal_title_y": 610,
+        "events_start_y": 680,
+        "event_step": 85,
+        "last_update_y": 1360,
+        "max_event_len": 50,
+        "weather_icon_size": 80
     }
 }
 
-# Select profile - Default to PORTRAIT now
+# Select profile
 PROFILE_NAME = os.environ.get("KINDLE_PROFILE", "KINDLE_PW4_PORTRAIT")
 cfg = PROFILES.get(PROFILE_NAME, PROFILES["KINDLE_PW4_PORTRAIT"])
 
@@ -83,67 +63,127 @@ OUTPUT_DIR = "output"
 BG_COLOR = 255
 FG_COLOR = 0
 
+# Helper to draw weather icons
+def draw_sun(draw, cx, cy, r):
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=FG_COLOR, width=3)
+    for i in range(8):
+        angle = math.radians(i * 45)
+        x1 = cx + int((r + 4) * math.cos(angle))
+        y1 = cy + int((r + 4) * math.sin(angle))
+        x2 = cx + int((r + 12) * math.cos(angle))
+        y2 = cy + int((r + 12) * math.sin(angle))
+        draw.line([(x1, y1), (x2, y2)], fill=FG_COLOR, width=3)
+
+def draw_cloud(draw, cx, cy, r):
+    # Left circle
+    draw.ellipse([cx - r, cy - r*0.2, cx - r*0.2, cy + r*0.6], fill=BG_COLOR, outline=FG_COLOR, width=3)
+    # Right circle
+    draw.ellipse([cx + r*0.2, cy - r*0.1, cx + r, cy + r*0.5], fill=BG_COLOR, outline=FG_COLOR, width=3)
+    # Center circle
+    draw.ellipse([cx - r*0.6, cy - r*0.7, cx + r*0.6, cy + r*0.5], fill=BG_COLOR, outline=FG_COLOR, width=3)
+    # Erase inner lines
+    draw.ellipse([cx - r*0.5, cy - r*0.6, cx + r*0.5, cy + r*0.4], fill=BG_COLOR)
+    draw.ellipse([cx - r*0.9, cy - r*0.1, cx - r*0.3, cy + r*0.5], fill=BG_COLOR)
+    draw.ellipse([cx + r*0.3, cy, cx + r*0.9, cy + r*0.4], fill=BG_COLOR)
+    draw.rectangle([cx - r*0.6, cy, cx + r*0.6, cy + r*0.5], fill=BG_COLOR)
+    # Draw bottom flat line
+    draw.line([(cx - r, cy + r*0.5), (cx + r, cy + r*0.5)], fill=FG_COLOR, width=3)
+
+def draw_rain(draw, cx, cy, r):
+    draw_cloud(draw, cx, cy - r*0.2, r)
+    # Rain drops
+    y_start = cy + r*0.4
+    y_end = cy + r*0.8
+    draw.line([(cx - r*0.4, y_start), (cx - r*0.5, y_end)], fill=FG_COLOR, width=3)
+    draw.line([(cx, y_start), (cx - r*0.1, y_end)], fill=FG_COLOR, width=3)
+    draw.line([(cx + r*0.4, y_start), (cx + r*0.3, y_end)], fill=FG_COLOR, width=3)
+
+def draw_thunder(draw, cx, cy, r):
+    draw_cloud(draw, cx, cy - r*0.2, r)
+    # Lightning bolt
+    y1 = cy + r*0.3
+    y2 = cy + r*0.6
+    y3 = cy + r*1.0
+    draw.line([(cx, y1), (cx - r*0.3, y2)], fill=FG_COLOR, width=3)
+    draw.line([(cx - r*0.3, y2), (cx + r*0.2, y2)], fill=FG_COLOR, width=3)
+    draw.line([(cx + r*0.2, y2), (cx - r*0.1, y3)], fill=FG_COLOR, width=3)
+
+def draw_snow(draw, cx, cy, r):
+    draw_cloud(draw, cx, cy - r*0.2, r)
+    # Snowflakes (dots)
+    y = cy + r*0.6
+    draw.ellipse([cx - r*0.5 - 2, y - 2, cx - r*0.5 + 2, y + 2], fill=FG_COLOR)
+    draw.ellipse([cx, y + r*0.3 - 2, cx, y + r*0.3 + 2], fill=FG_COLOR)
+    draw.ellipse([cx + r*0.5 - 2, y - 2, cx + r*0.5 + 2, y + 2], fill=FG_COLOR)
+
+def draw_fog(draw, cx, cy, r):
+    draw.line([(cx - r, cy - r*0.4), (cx + r, cy - r*0.4)], fill=FG_COLOR, width=3)
+    draw.line([(cx - r*0.8, cy), (cx + r*0.8, cy)], fill=FG_COLOR, width=3)
+    draw.line([(cx - r, cy + r*0.4), (cx + r, cy + r*0.4)], fill=FG_COLOR, width=3)
+
+def draw_weather_icon(draw, code, x, y, size):
+    cx = x + size // 2
+    cy = y + size // 2
+    r = size // 4
+    
+    # Map WMO codes to drawing functions
+    if code in [0, 1]:
+        draw_sun(draw, cx, cy, r)
+    elif code in [2, 3]:
+        draw_cloud(draw, cx, cy, r)
+    elif code in [45, 48]:
+        draw_fog(draw, cx, cy, r)
+    elif code in [51, 53, 55, 61, 63, 65, 80, 81, 82]:
+        draw_rain(draw, cx, cy, r)
+    elif code in [71, 73, 75, 77, 85, 86]:
+        draw_snow(draw, cx, cy, r)
+    elif code in [95, 96, 99]:
+        draw_thunder(draw, cx, cy, r)
+    else:
+        draw_cloud(draw, cx, cy, r)
+
+def get_italian_day_name(dt):
+    days = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
+    return days[dt.weekday()]
+
 def get_real_weather():
     if os.environ.get("MOCK_MODE") == "1":
-        return {
-            "current": {
-                "temp": 34,
-                "apparent": 36,
-                "humidity": 35,
-                "wind": 12,
-                "condition": "Parz. Nuvoloso"
-            },
-            "forecast": [
-                {"day": "Sab 27", "temp_max": 37, "temp_min": 27, "condition": "Rovesci Pioggia"},
-                {"day": "Dom 28", "temp_max": 35, "temp_min": 26, "condition": "Nuvoloso"}
-            ]
-        }
+        return [
+            {"day": "Oggi", "temp_max": 34, "temp_min": 23, "code": 1},
+            {"day": "Domani", "temp_max": 37, "temp_min": 27, "code": 80},
+            {"day": "Dom", "temp_max": 35, "temp_min": 26, "code": 3},
+            {"day": "Lun", "temp_max": 32, "temp_min": 22, "code": 0},
+            {"day": "Mar", "temp_max": 30, "temp_min": 20, "code": 2}
+        ]
     
     LAT, LON = 45.6485, 9.2044
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=3"
-    
-    weather_codes = {
-        0: "Sereno", 1: "Quasi Sereno", 2: "Parz. Nuvoloso", 3: "Nuvoloso",
-        45: "Nebbia", 48: "Nebbia", 51: "Pioggerella", 53: "Pioggerella", 55: "Pioggerella",
-        61: "Pioggia Leggera", 63: "Pioggia", 65: "Pioggia Forte",
-        71: "Neve Leggera", 73: "Neve", 75: "Neve Forte",
-        77: "Nevischio",
-        80: "Rovesci Pioggia", 81: "Rovesci Pioggia", 82: "Rovesci Pioggia",
-        85: "Rovesci Neve", 86: "Rovesci Neve",
-        95: "Temporale", 96: "Temporale", 99: "Temporale"
-    }
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=5"
     
     try:
         response = requests.get(url, timeout=10)
         data = response.json()
-        current = data["current"]
         daily = data["daily"]
         
-        current_data = {
-            "temp": round(current["temperature_2m"]),
-            "apparent": round(current["apparent_temperature"]),
-            "humidity": round(current["relative_humidity_2m"]),
-            "wind": round(current["wind_speed_10m"]),
-            "condition": weather_codes.get(current["weather_code"], "Variabile")
-        }
-        
         forecast_data = []
-        for i in range(1, 3):
+        for i in range(5):
             date_str = daily["time"][i]
             dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-            day_formatted = dt.strftime("%d/%m")
             
+            if i == 0:
+                day_name = "Oggi"
+            elif i == 1:
+                day_name = "Domani"
+            else:
+                day_name = get_italian_day_name(dt)
+                
             forecast_data.append({
-                "day": day_formatted,
+                "day": day_name,
                 "temp_max": round(daily["temperature_2m_max"][i]),
                 "temp_min": round(daily["temperature_2m_min"][i]),
-                "condition": weather_codes.get(daily["weather_code"][i], "Variabile")
+                "code": daily["weather_code"][i]
             })
             
-        return {
-            "current": current_data,
-            "forecast": forecast_data
-        }
+        return forecast_data
     except Exception as e:
         print(f"Errore meteo: {e}")
         return None
@@ -155,7 +195,8 @@ def get_google_calendar_events():
             "- 27/06 09:00: Riunione di condominio",
             "- 28/06 11:00: Pranzo dai nonni",
             "- 29/06 14:00: Dentista",
-            "- 02/07 (Tutto il giorno): Compleanno"
+            "- 02/07 (Tutto il giorno): Compleanno",
+            "- 05/07 10:00: Spesa grossa"
         ]
 
     calendar_id = os.environ.get("CALENDAR_URL")
@@ -173,7 +214,7 @@ def get_google_calendar_events():
     events_result = service.events().list(
         calendarId=calendar_id, 
         timeMin=now_utc,
-        maxResults=5,
+        maxResults=6,
         singleEvents=True,
         orderBy='startTime'
     ).execute()
@@ -216,42 +257,76 @@ def create_dashboard():
         font_bold_path = "DejaVuSans-Bold.ttf"
 
     try:
-        font_large = ImageFont.truetype(font_bold_path, cfg["font_large_size"])
+        font_header = ImageFont.truetype(font_bold_path, cfg["font_header_size"])
         font_medium = ImageFont.truetype(font_bold_path, cfg["font_medium_size"])
         font_regular = ImageFont.truetype(font_path, cfg["font_regular_size"])
         font_small = ImageFont.truetype(font_path, cfg["font_small_size"])
-        font_temp = ImageFont.truetype(font_bold_path, cfg["font_large_size"] + 20)
+        font_bold_small = ImageFont.truetype(font_bold_path, cfg["font_small_size"])
     except IOError:
         print("Font non trovati, uso default")
-        font_large = ImageFont.load_default()
+        font_header = ImageFont.load_default()
         font_medium = ImageFont.load_default()
         font_regular = ImageFont.load_default()
         font_small = ImageFont.load_default()
-        font_temp = ImageFont.load_default()
+        font_bold_small = ImageFont.load_default()
 
     fuso_orario = pytz.timezone('Europe/Rome')
     now = datetime.datetime.now(fuso_orario)
     
-    # Intestazione Data
-    days = ["LUNEDÌ", "MARTEDÌ", "MERCOLEDÌ", "GIOVEDÌ", "VENERDÌ", "SABATO", "DOMENICA"]
-    months = ["GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO", "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"]
-    date_str = f"{days[now.weekday()]} {now.day} {months[now.month-1]}"
-    year_str = str(now.year)
+    # 1. Header (Custom Text)
+    header_str = "Silvia & Niki's Home"
+    w_header = draw.textlength(header_str, font=font_header)
+    draw.text(((WIDTH - w_header) / 2, cfg["header_y"]), header_str, font=font_header, fill=FG_COLOR)
     
-    # Disegna Data Centrata
-    w_date = draw.textlength(date_str, font=font_large)
-    draw.text(((WIDTH - w_date) / 2, cfg["date_y"]), date_str, font=font_large, fill=FG_COLOR)
-    
-    w_year = draw.textlength(year_str, font=font_medium)
-    draw.text(((WIDTH - w_year) / 2, cfg["date_y"] + cfg["font_large_size"] + 10), year_str, font=font_medium, fill=FG_COLOR)
+    # Date Subheader
+    days = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
+    months = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
+    date_str = f"{days[now.weekday()]} {now.day} {months[now.month-1]} {now.year}"
+    w_date = draw.textlength(date_str, font=font_regular)
+    draw.text(((WIDTH - w_date) / 2, cfg["date_y"]), date_str, font=font_regular, fill=FG_COLOR)
 
     # Linea 1
     draw.line([(cfg["margin_x"], cfg["line1_y"]), (WIDTH - cfg["margin_x"], cfg["line1_y"])], fill=FG_COLOR, width=2)
 
-    # Titolo Calendario
+    # 2. Weather Section (Weekly Forecast)
+    draw.text((cfg["margin_x"], cfg["weather_title_y"]), "METEO SETTIMANALE (Seregno)", font=font_medium, fill=FG_COLOR)
+    
+    weather = get_real_weather()
+    if weather:
+        y_forecast = cfg["forecast_y"]
+        col_width = (WIDTH - 2 * cfg["margin_x"]) / 5
+        icon_size = cfg["weather_icon_size"]
+        
+        for i, fc in enumerate(weather):
+            col_x = cfg["margin_x"] + i * col_width
+            cx = col_x + col_width // 2
+            
+            # Day name
+            w_day = draw.textlength(fc["day"], font=font_regular)
+            draw.text((cx - w_day / 2, y_forecast), fc["day"], font=font_regular, fill=FG_COLOR)
+            
+            # Icon
+            icon_x = cx - icon_size // 2
+            icon_y = y_forecast + 50
+            draw_weather_icon(draw, fc["code"], icon_x, icon_y, icon_size)
+            
+            # Temp Max / Min
+            temp_str = f"{fc['temp_max']}° / {fc['temp_min']}°"
+            w_temp = draw.textlength(temp_str, font=font_small)
+            draw.text((cx - w_temp / 2, icon_y + icon_size + 20), temp_str, font=font_bold_small, fill=FG_COLOR)
+            
+            # Vertical separator
+            if i > 0:
+                draw.line([(col_x, y_forecast), (col_x, y_forecast + icon_size + 90)], fill=FG_COLOR, width=1)
+    else:
+        draw.text((cfg["margin_x"], cfg["forecast_y"]), "Dati Meteo Non Disponibili", font=font_regular, fill=FG_COLOR)
+
+    # Linea 2
+    draw.line([(cfg["margin_x"], cfg["line2_y"]), (WIDTH - cfg["margin_x"], cfg["line2_y"])], fill=FG_COLOR, width=2)
+
+    # 3. Calendar Section
     draw.text((cfg["margin_x"], cfg["cal_title_y"]), "I PROSSIMI IMPEGNI", font=font_medium, fill=FG_COLOR)
     
-    # Eventi Calendario
     try:
         eventi = get_google_calendar_events()
     except Exception as e:
@@ -264,46 +339,6 @@ def create_dashboard():
             evento = evento[:cfg["max_event_len"]-3] + "..."
         draw.text((cfg["margin_x"], y_offset), evento, font=font_regular, fill=FG_COLOR)
         y_offset += cfg["event_step"]
-
-    # Linea 2
-    draw.line([(cfg["margin_x"], cfg["line2_y"]), (WIDTH - cfg["margin_x"], cfg["line2_y"])], fill=FG_COLOR, width=2)
-
-    # Sezione Meteo
-    draw.text((cfg["margin_x"], cfg["weather_title_y"]), "METEO SEREGNO", font=font_medium, fill=FG_COLOR)
-    
-    weather = get_real_weather()
-    if weather:
-        curr = weather["current"]
-        # Temperatura attuale gigante
-        temp_str = f"{curr['temp']}°"
-        draw.text((cfg["margin_x"], cfg["weather_temp_y"]), temp_str, font=font_temp, fill=FG_COLOR)
-        
-        # Condizioni e dettagli affiancati
-        w_temp = draw.textlength(temp_str, font=font_temp)
-        details_x = cfg["margin_x"] + w_temp + 40
-        
-        cond_str = curr["condition"]
-        draw.text((details_x, cfg["weather_temp_y"] + 10), cond_str, font=font_medium, fill=FG_COLOR)
-        
-        details_str = f"Percepita: {curr['apparent']}°C  |  Vento: {curr['wind']} km/h  |  Umidità: {curr['humidity']}%"
-        draw.text((cfg["margin_x"], cfg["weather_details_y"]), details_str, font=font_regular, fill=FG_COLOR)
-        
-        # Previsioni future (2 giorni) in colonne
-        y_forecast = cfg["forecast_y"]
-        col_width = (WIDTH - 2 * cfg["margin_x"]) / 2
-        
-        for i, fc in enumerate(weather["forecast"]):
-            fc_x = cfg["margin_x"] + i * col_width
-            # Linea verticale separatrice
-            if i > 0:
-                draw.line([(fc_x - 20, y_forecast), (fc_x - 20, y_forecast + 80)], fill=FG_COLOR, width=1)
-                
-            fc_title = f"{fc['day']}: {fc['temp_max']}° / {fc['temp_min']}°"
-            draw.text((fc_x, y_forecast), fc_title, font=font_regular, fill=FG_COLOR)
-            draw.text((fc_x, y_forecast + 35), fc["condition"], font=font_small, fill=FG_COLOR)
-            
-    else:
-        draw.text((cfg["margin_x"], cfg["weather_temp_y"]), "Dati Meteo Non Disponibili", font=font_regular, fill=FG_COLOR)
 
     # Footer: Info Ultimo Aggiornamento
     time_str = now.strftime("%H:%M")
