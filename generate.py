@@ -47,10 +47,10 @@ PROFILES = {
         "curr_weather_y": 200,
         "curr_weather_icon_size": 120,
         "forecast_y": 370,
-        "forecast_icon_size": 70,
-        "line2_y": 570,
-        "cal_title_y": 600,
-        "events_start_y": 670,
+        "forecast_icon_size": 100,
+        "line2_y": 590,
+        "cal_title_y": 620,
+        "events_start_y": 690,
         "event_step": 85,
         "line3_y": 1250,
         "last_update_y": 1320,
@@ -271,11 +271,15 @@ def get_google_calendar_events():
     credentials = Credentials.from_service_account_info(creds_data, scopes=['https://www.googleapis.com/auth/calendar.readonly'])
     service = build('calendar', 'v3', credentials=credentials)
     
-    now_utc = datetime.datetime.utcnow().isoformat() + 'Z'
+    now_utc_dt = datetime.datetime.utcnow()
+    now_utc = now_utc_dt.isoformat() + 'Z'
+    max_dt_utc = now_utc_dt + datetime.timedelta(days=7)
+    time_max_str = max_dt_utc.isoformat() + 'Z'
     
     events_result = service.events().list(
         calendarId=calendar_id, 
         timeMin=now_utc,
+        timeMax=time_max_str,
         maxResults=6,
         singleEvents=True,
         orderBy='startTime'
@@ -308,6 +312,7 @@ def get_google_calendar_events():
     return formatted_events
 
 def create_dashboard():
+    # Create high-res image for super-sampling
     img = Image.new('L', (WIDTH, HEIGHT), color=BG_COLOR)
     draw = ImageDraw.Draw(img)
     
