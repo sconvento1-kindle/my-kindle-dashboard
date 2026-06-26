@@ -29,11 +29,10 @@ PROFILES = {
         "cal_title_y": 325,
         "events_start_y": 365,
         "event_step": 32,
-        "quote_y": 480,
-        "quote_line_step": 20,
-        "font_quote_size": 14,
-        "font_quote_song_size": 11,
-        "line3_y": 540,
+        "quote_box_y1": 460,
+        "quote_box_height": 90,
+        "font_quote_size": 13,
+        "font_quote_song_size": 10,
         "last_update_y": 570,
         "max_event_len": 45
     },
@@ -56,12 +55,11 @@ PROFILES = {
         "cal_title_y": 650,
         "events_start_y": 720,
         "event_step": 85,
-        "quote_y": 1100,
-        "quote_line_step": 40,
+        "quote_box_y1": 1090,
+        "quote_box_height": 210,
         "font_quote_size": 24,
         "font_quote_song_size": 18,
-        "line3_y": 1280,
-        "last_update_y": 1350,
+        "last_update_y": 1360,
         "max_event_len": 50
     }
 }
@@ -91,6 +89,7 @@ WIDTH, HEIGHT = TARGET_WIDTH * SCALE, TARGET_HEIGHT * SCALE
 OUTPUT_DIR = "output"
 BG_COLOR = 255
 FG_COLOR = 0
+BOX_BG_COLOR = 242 # Light gray (out of 255) for quote box background
 
 # Helper to draw weather icons
 def draw_sun(draw, cx, cy, r):
@@ -162,6 +161,24 @@ def draw_fog(draw, cx, cy, r):
     draw.line([(cx - r, cy - r*0.4), (cx + r, cy - r*0.4)], fill=FG_COLOR, width=4*SCALE)
     draw.line([(cx - r*0.8, cy), (cx + r*0.8, cy)], fill=FG_COLOR, width=4*SCALE)
     draw.line([(cx - r, cy + r*0.4), (cx + r, cy + r*0.4)], fill=FG_COLOR, width=4*SCALE)
+
+def draw_music_note(draw, cx, cy, size):
+    r_head = size // 4
+    head_cx = cx - r_head
+    head_cy = cy + r_head
+    
+    # Note head
+    draw.ellipse([head_cx - r_head, head_cy - r_head, head_cx + r_head, head_cy + r_head], fill=FG_COLOR)
+    
+    # Stem
+    stem_x = head_cx + r_head - 1*SCALE
+    stem_top_y = cy - size // 2
+    draw.line([(stem_x, head_cy), (stem_x, stem_top_y)], fill=FG_COLOR, width=3*SCALE)
+    
+    # Flag
+    flag_end_x = stem_x + int(size * 0.4)
+    flag_end_y = stem_top_y + int(size * 0.3)
+    draw.line([(stem_x, stem_top_y), (flag_end_x, flag_end_y)], fill=FG_COLOR, width=3*SCALE)
 
 def draw_weather_icon(draw, code, x, y, size):
     cx = x + size // 2
@@ -494,14 +511,33 @@ def create_dashboard():
         draw.text((cfg["margin_x"], y_offset), evento, font=font_regular, fill=FG_COLOR)
         y_offset += cfg["event_step"]
 
-    # 5. Quote of the Day Section
+    # 5. Quote of the Day Section (Inside a rounded box card)
     quote_data = get_lyrics()
     if quote_data:
-        # Quote Text wrapped to fit screen width
-        quote_text_formatted = f'"{quote_data["text"]}"'
-        quote_lines = wrap_text(quote_text_formatted, font_quote, WIDTH - 2 * cfg["margin_x"], draw)
+        box_y1 = cfg["quote_box_y1"]
+        box_y2 = box_y1 + cfg["quote_box_height"]
+        box_x1 = cfg["margin_x"]
+        box_x2 = WIDTH - cfg["margin_x"]
         
-        y_curr = cfg["quote_y"]
+        # Draw light gray rounded rectangle card
+        draw.rounded_rectangle(
+            [box_x1, box_y1, box_x2, box_y2], 
+            radius=15*SCALE, 
+            fill=BOX_BG_COLOR, 
+            outline=FG_COLOR, 
+            width=2*SCALE
+        )
+        
+        # Draw Music Note Icon centered in the top part of the box
+        music_icon_size = 25 * SCALE
+        draw_music_note(draw, WIDTH // 2, box_y1 + 35 * SCALE, music_icon_size)
+        
+        # Quote Text wrapped (with extra padding for box borders)
+        quote_text_formatted = f'"{quote_data["text"]}"'
+        max_text_width = (box_x2 - box_x1) - 60 * SCALE # 30px padding on each side
+        quote_lines = wrap_text(quote_text_formatted, font_quote, max_text_width, draw)
+        
+        y_curr = box_y1 + 75 * SCALE # Start drawing text below music note
         for line in quote_lines:
             w_line = draw.textlength(line, font=font_quote)
             draw.text(((WIDTH - w_line) / 2, y_curr), line, font=font_quote, fill=FG_COLOR)
@@ -511,9 +547,6 @@ def create_dashboard():
         song_str = f"— {quote_data['song']}"
         w_song = draw.textlength(song_str, font=font_quote_song)
         draw.text(((WIDTH - w_song) / 2, y_curr + 10 * SCALE), song_str, font=font_quote_song, fill=FG_COLOR)
-
-    # Linea 3
-    draw.line([(cfg["margin_x"], cfg["line3_y"]), (WIDTH - cfg["margin_x"], cfg["line3_y"])], fill=FG_COLOR, width=1*SCALE)
 
     # Footer: Info Ultimo Aggiornamento
     time_str = now.strftime("%H:%M")
@@ -536,3 +569,4 @@ def create_dashboard():
 
 if __name__ == "__main__":
     create_dashboard()
+,Description:Write generate.py with quote box card design.,Overwrite:true,TargetFile:/usr/local/google/home/silviaconvento/.gemini/jetski/scratch/kindle_dashboard/generate.py,toolAction:Writing updated generate.py file,toolSummary:Update generate.py}
