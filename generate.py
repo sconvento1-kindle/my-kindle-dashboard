@@ -29,6 +29,10 @@ PROFILES = {
         "cal_title_y": 325,
         "events_start_y": 365,
         "event_step": 32,
+        "quote_y": 480,
+        "quote_line_step": 20,
+        "font_quote_size": 14,
+        "font_quote_song_size": 11,
         "line3_y": 540,
         "last_update_y": 570,
         "max_event_len": 45
@@ -52,6 +56,10 @@ PROFILES = {
         "cal_title_y": 650,
         "events_start_y": 720,
         "event_step": 85,
+        "quote_y": 1100,
+        "quote_line_step": 40,
+        "font_quote_size": 24,
+        "font_quote_song_size": 18,
         "line3_y": 1280,
         "last_update_y": 1350,
         "max_event_len": 50
@@ -256,9 +264,7 @@ def get_google_calendar_events():
             "- Oggi, 18:30: Aperitivo con amici",
             "- 27/06 09:00: Riunione di condominio",
             "- 28/06 11:00: Pranzo dai nonni",
-            "- 29/06 14:00: Dentista",
-            "- 02/07 (Tutto il giorno): Compleanno",
-            "- 05/07 10:00: Spesa grossa"
+            "- 29/06 14:00: Dentista"
         ]
 
     calendar_id = os.environ.get("CALENDAR_URL")
@@ -287,7 +293,7 @@ def get_google_calendar_events():
         calendarId=calendar_id, 
         timeMin=time_min_str,
         timeMax=time_max_str,
-        maxResults=6,
+        maxResults=4, # Limit to 4 events to prevent overlap with quote
         singleEvents=True,
         orderBy='startTime'
     ).execute()
@@ -324,6 +330,46 @@ def get_google_calendar_events():
         
     return formatted_events
 
+def get_lyrics():
+    # Load lyrics from local JSON file
+    try:
+        json_path = "lyrics.json"
+        if not os.path.exists(json_path):
+            # Try path relative to script directory
+            script_dir = os.path.dirname(os.path.realpath(__file__))
+            json_path = os.path.join(script_dir, "lyrics.json")
+            
+        with open(json_path, "r", encoding="utf-8") as f:
+            lyrics_list = json.load(f)
+        if not lyrics_list:
+            return None
+        
+        fuso_orario = pytz.timezone('Europe/Rome')
+        now = datetime.datetime.now(fuso_orario)
+        day_of_year = now.timetuple().tm_yday
+        
+        # Select based on day of year to change once a day
+        return lyrics_list[day_of_year % len(lyrics_list)]
+    except Exception as e:
+        print(f"Errore caricamento lyrics: {e}")
+        return None
+
+def wrap_text(text, font, max_width, draw):
+    words = text.split(' ')
+    lines = []
+    current_line = []
+    for word in words:
+        test_line = ' '.join(current_line + [word])
+        width = draw.textlength(test_line, font=font)
+        if width <= max_width:
+            current_line.append(word)
+        else:
+            lines.append(' '.join(current_line))
+            current_line = [word]
+    if current_line:
+        lines.append(' '.join(current_line))
+    return lines
+
 def create_dashboard():
     img = Image.new('L', (WIDTH, HEIGHT), color=BG_COLOR)
     draw = ImageDraw.Draw(img)
@@ -342,6 +388,8 @@ def create_dashboard():
         font_small = ImageFont.truetype(font_path, cfg["font_small_size"])
         font_bold_small = ImageFont.truetype(font_bold_path, cfg["font_small_size"])
         font_temp_large = ImageFont.truetype(font_bold_path, cfg["font_header_size"] + 30*SCALE)
+        font_quote = ImageFont.truetype(font_path, cfg["font_quote_size"])
+        font_quote_song = ImageFont.truetype(font_path, cfg["font_quote_song_size"])
     except IOError:
         print("Font non trovati, uso default")
         font_header = ImageFont.load_default()
@@ -350,6 +398,8 @@ def create_dashboard():
         font_small = ImageFont.load_default()
         font_bold_small = ImageFont.load_default()
         font_temp_large = ImageFont.load_default()
+        font_quote = ImageFont.load_default()
+        font_quote_song = ImageFont.load_default()
 
     fuso_orario = pytz.timezone('Europe/Rome')
     now = datetime.datetime.now(fuso_orario)
@@ -443,6 +493,24 @@ def create_dashboard():
             evento = evento[:cfg["max_event_len"]-3] + "..."
         draw.text((cfg["margin_x"], y_offset), evento, font=font_regular, fill=FG_COLOR)
         y_offset += cfg["event_step"]
+
+    # 5. Quote of the Day Section
+    quote_data = get_lyrics()
+    if quote_data:
+        # Quote Text wrapped to fit screen width
+        quote_text_formatted = f'"{quote_data["text"]}"'
+        quote_lines = wrap_text(quote_text_formatted, font_quote, WIDTH - 2 * cfg["margin_x"], draw)
+        
+        y_curr = cfg["quote_y"]
+        for line in quote_lines:
+            w_line = draw.textlength(line, font=font_quote)
+            draw.text(((WIDTH - w_line) / 2, y_curr), line, font=font_quote, fill=FG_COLOR)
+            y_curr += cfg["quote_line_step"]
+            
+        # Song Info
+        song_str = f"— {quote_data['song']}"
+        w_song = draw.textlength(song_str, font=font_quote_song)
+        draw.text(((WIDTH - w_song) / 2, y_curr + 10 * SCALE), song_str, font=font_quote_song, fill=FG_COLOR)
 
     # Linea 3
     draw.line([(cfg["margin_x"], cfg["line3_y"]), (WIDTH - cfg["margin_x"], cfg["line3_y"])], fill=FG_COLOR, width=1*SCALE)
