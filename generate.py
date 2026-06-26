@@ -38,10 +38,10 @@ PROFILES = {
         "font_regular_size": 28,
         "font_small_size": 22,
         "margin_x": 80,
-        "date_y": 80,
-        "line1_y": 200,
-        "cal_title_y": 240,
-        "events_start_y": 310,
+        "date_y": 60,
+        "line1_y": 210,
+        "cal_title_y": 250,
+        "events_start_y": 320,
         "event_step": 75,
         "line2_y": 780,
         "weather_title_y": 820,
@@ -128,10 +128,8 @@ def get_real_weather():
         }
         
         forecast_data = []
-        # Index 0 is today, 1 is tomorrow, 2 is day after
-        for i in range(1, 3): # 1 and 2 (tomorrow and day after)
+        for i in range(1, 3):
             date_str = daily["time"][i]
-            # Convert YYYY-MM-DD to DD/MM
             dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
             day_formatted = dt.strftime("%d/%m")
             
@@ -175,7 +173,7 @@ def get_google_calendar_events():
     events_result = service.events().list(
         calendarId=calendar_id, 
         timeMin=now_utc,
-        maxResults=5, # Aumentato a 5
+        maxResults=5,
         singleEvents=True,
         orderBy='startTime'
     ).execute()
