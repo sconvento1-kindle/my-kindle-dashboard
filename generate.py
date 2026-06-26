@@ -271,14 +271,21 @@ def get_google_calendar_events():
     credentials = Credentials.from_service_account_info(creds_data, scopes=['https://www.googleapis.com/auth/calendar.readonly'])
     service = build('calendar', 'v3', credentials=credentials)
     
-    now_utc_dt = datetime.datetime.utcnow()
-    now_utc = now_utc_dt.isoformat() + 'Z'
-    max_dt_utc = now_utc_dt + datetime.timedelta(days=7)
-    time_max_str = max_dt_utc.isoformat() + 'Z'
+    # Calculate timeMin (start of today in Rome time, converted to UTC)
+    fuso_orario = pytz.timezone('Europe/Rome')
+    now_rome = datetime.datetime.now(fuso_orario)
+    start_of_today_rome = now_rome.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today_utc = start_of_today_rome.astimezone(pytz.utc)
+    time_min_str = start_of_today_utc.isoformat().replace('+00:00', 'Z')
+    
+    # Calculate timeMax (start of today + 8 days in Rome time, to cover all of the 7th day, converted to UTC)
+    end_of_period_rome = start_of_today_rome + datetime.timedelta(days=8)
+    end_of_period_utc = end_of_period_rome.astimezone(pytz.utc)
+    time_max_str = end_of_period_utc.isoformat().replace('+00:00', 'Z')
     
     events_result = service.events().list(
         calendarId=calendar_id, 
-        timeMin=now_utc,
+        timeMin=time_min_str,
         timeMax=time_max_str,
         maxResults=6,
         singleEvents=True,
@@ -297,7 +304,6 @@ def get_google_calendar_events():
         return ["Nessun impegno in programma"]
     
     formatted_events = []
-    fuso_orario = pytz.timezone('Europe/Rome')
     
     for event in events:
         summary = event.get('summary', 'Impegno senza titolo')
