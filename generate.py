@@ -286,6 +286,13 @@ def get_google_calendar_events():
     ).execute()
     
     events = events_result.get('items', [])
+    
+    # --- RIGHE DI DEBUG ---
+    print(f"DEBUG: API returned {len(events)} events raw.")
+    for e in events:
+        print(f"DEBUG: Event: {e.get('summary')} at {e['start'].get('dateTime', e['start'].get('date'))}")
+    # ----------------------
+    
     if not events:
         return ["Nessun impegno in programma"]
     
