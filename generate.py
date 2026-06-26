@@ -404,4 +404,54 @@ def create_dashboard():
             # Temp Max / Min
             temp_str = f"{fc['temp_max']}° / {fc['temp_min']}°"
             w_temp = draw.textlength(temp_str, font=font_small)
-            draw.text((cx - w_temp / 2, icon_y + icon_size + 15 * SCALE
+            draw.text((cx - w_temp / 2, icon_y + icon_size + 15 * SCALE), temp_str, font=font_bold_small, fill=FG_COLOR)
+            
+            # Vertical separator
+            if i > 0:
+                draw.line([(col_x, y_forecast), (col_x, y_forecast + icon_size + 70 * SCALE)], fill=FG_COLOR, width=1*SCALE)
+    else:
+        draw.text((cfg["margin_x"], cfg["forecast_y"]), "Dati Meteo Non Disponibili", font=font_regular, fill=FG_COLOR)
+
+    # Linea 2
+    draw.line([(cfg["margin_x"], cfg["line2_y"]), (WIDTH - cfg["margin_x"], cfg["line2_y"])], fill=FG_COLOR, width=2*SCALE)
+
+    # 4. Calendar Section
+    draw.text((cfg["margin_x"], cfg["cal_title_y"]), "I PROSSIMI IMPEGNI", font=font_medium, fill=FG_COLOR)
+    
+    try:
+        eventi = get_google_calendar_events()
+    except Exception as e:
+        error_msg = str(e).replace('\n', ' ').strip()
+        eventi = [f"- Errore Calendario: {error_msg[:45]}..."]
+    
+    y_offset = cfg["events_start_y"]
+    for evento in eventi:
+        if len(evento) > cfg["max_event_len"]:
+            evento = evento[:cfg["max_event_len"]-3] + "..."
+        draw.text((cfg["margin_x"], y_offset), evento, font=font_regular, fill=FG_COLOR)
+        y_offset += cfg["event_step"]
+
+    # Linea 3
+    draw.line([(cfg["margin_x"], cfg["line3_y"]), (WIDTH - cfg["margin_x"], cfg["line3_y"])], fill=FG_COLOR, width=1*SCALE)
+
+    # Footer: Info Ultimo Aggiornamento
+    time_str = now.strftime("%H:%M")
+    date_update_str = now.strftime("%d/%m")
+    footer_str = f"Ultimo aggiornamento: {date_update_str} alle {time_str}"
+    w_footer = draw.textlength(footer_str, font=font_small)
+    draw.text(((WIDTH - w_footer) / 2, cfg["last_update_y"]), footer_str, font=font_small, fill=FG_COLOR)
+
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+        
+    # Resize high-res image back to target resolution with Lanczos filter
+    img_grayscale = img.convert('L')
+    img_grayscale.putpixel((0, 0), 250)
+    
+    img_resized = img_grayscale.resize((TARGET_WIDTH, TARGET_HEIGHT), Image.Resampling.LANCZOS)
+    img_resized.save(os.path.join(OUTPUT_DIR, "dashboard.png"), "PNG")
+    
+    print(f"Dashboard generata con successo alle ore: {time_str} del {date_str}")
+
+if __name__ == "__main__":
+    create_dashboard()
