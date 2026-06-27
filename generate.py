@@ -8,6 +8,8 @@ import pytz
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
+print("DEBUG: Script avviato")
+
 # Configuration profiles
 PROFILES = {
     "KINDLE_BASIC": {
@@ -44,7 +46,7 @@ PROFILES = {
     "KINDLE_PW4_PORTRAIT": {
         "width": 1072,
         "height": 1448,
-        "font_header_size": 48, # Slightly smaller to accommodate avatar
+        "font_header_size": 48,
         "font_medium_size": 35,
         "font_regular_size": 26,
         "font_small_size": 20,
@@ -79,10 +81,8 @@ PROFILES = {
 PROFILE_NAME = os.environ.get("KINDLE_PROFILE", "KINDLE_PW4_PORTRAIT")
 cfg_base = PROFILES.get(PROFILE_NAME, PROFILES["KINDLE_PW4_PORTRAIT"])
 
-# Super-sampling scale factor (2x for anti-aliasing)
 SCALE = 2
 
-# Scale the configuration values dynamically
 cfg = {}
 for k, v in cfg_base.items():
     if k in ["width", "height", "max_event_len"]:
@@ -100,7 +100,12 @@ WIDTH, HEIGHT = TARGET_WIDTH * SCALE, TARGET_HEIGHT * SCALE
 OUTPUT_DIR = "output"
 BG_COLOR = 255
 FG_COLOR = 0
-BOX_BG_COLOR = 242 # Light gray (out of 255) for quote box background
+BOX_BG_COLOR = 242
+
+# Assicuriamoci che la cartella output esista SUBITO all'avvio
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+    print("DEBUG: Creata cartella output")
 
 # Helper to draw weather icons
 def draw_sun(draw, cx, cy, r):
@@ -114,35 +119,25 @@ def draw_sun(draw, cx, cy, r):
         draw.line([(x1, y1), (x2, y2)], fill=FG_COLOR, width=4*SCALE)
 
 def draw_cloud(draw, cx, cy, r):
-    # Left circle
     draw.ellipse([cx - r, cy - r*0.2, cx - r*0.2, cy + r*0.6], fill=BG_COLOR, outline=FG_COLOR, width=4*SCALE)
-    # Right circle
     draw.ellipse([cx + r*0.2, cy - r*0.1, cx + r, cy + r*0.5], fill=BG_COLOR, outline=FG_COLOR, width=4*SCALE)
-    # Center circle
     draw.ellipse([cx - r*0.6, cy - r*0.7, cx + r*0.6, cy + r*0.5], fill=BG_COLOR, outline=FG_COLOR, width=4*SCALE)
-    # Erase inner lines
     draw.ellipse([cx - r*0.5, cy - r*0.6, cx + r*0.5, cy + r*0.4], fill=BG_COLOR)
     draw.ellipse([cx - r*0.9, cy - r*0.1, cx - r*0.3, cy + r*0.5], fill=BG_COLOR)
     draw.ellipse([cx + r*0.3, cy, cx + r*0.9, cy + r*0.4], fill=BG_COLOR)
     draw.rectangle([cx - r*0.6, cy, cx + r*0.6, cy + r*0.5], fill=BG_COLOR)
-    # Draw bottom flat line
     draw.line([(cx - r, cy + r*0.5), (cx + r, cy + r*0.5)], fill=FG_COLOR, width=4*SCALE)
 
 def draw_sun_behind_cloud(draw, cx, cy, r):
-    # Sun shifted top-right, slightly smaller
     draw_sun(draw, cx + r*0.4, cy - r*0.3, r*0.6)
-    # Cloud centered-left, filled with white to cover sun
     draw_cloud(draw, cx - r*0.2, cy + r*0.2, r*0.9)
 
 def draw_two_clouds(draw, cx, cy, r):
-    # Back cloud, smaller
     draw_cloud(draw, cx + r*0.3, cy - r*0.2, r*0.75)
-    # Front cloud, filled with white
     draw_cloud(draw, cx - r*0.2, cy + r*0.2, r*0.9)
 
 def draw_rain(draw, cx, cy, r):
     draw_cloud(draw, cx, cy - r*0.2, r)
-    # Rain drops
     y_start = cy + r*0.4
     y_end = cy + r*0.8
     draw.line([(cx - r*0.4, y_start), (cx - r*0.5, y_end)], fill=FG_COLOR, width=4*SCALE)
@@ -151,7 +146,6 @@ def draw_rain(draw, cx, cy, r):
 
 def draw_thunder(draw, cx, cy, r):
     draw_cloud(draw, cx, cy - r*0.2, r)
-    # Lightning bolt
     y1 = cy + r*0.3
     y2 = cy + r*0.6
     y3 = cy + r*1.0
@@ -161,7 +155,6 @@ def draw_thunder(draw, cx, cy, r):
 
 def draw_snow(draw, cx, cy, r):
     draw_cloud(draw, cx, cy - r*0.2, r)
-    # Snowflakes (dots)
     y = cy + r*0.6
     dot_r = 2 * SCALE
     draw.ellipse([cx - r*0.5 - dot_r, y - dot_r, cx - r*0.5 + dot_r, y + dot_r], fill=FG_COLOR)
@@ -177,16 +170,10 @@ def draw_music_note(draw, cx, cy, size):
     r_head = size // 4
     head_cx = cx - r_head
     head_cy = cy + r_head
-    
-    # Note head
     draw.ellipse([head_cx - r_head, head_cy - r_head, head_cx + r_head, head_cy + r_head], fill=FG_COLOR)
-    
-    # Stem
     stem_x = head_cx + r_head - 1*SCALE
     stem_top_y = cy - size // 2
     draw.line([(stem_x, head_cy), (stem_x, stem_top_y)], fill=FG_COLOR, width=3*SCALE)
-    
-    # Flag
     flag_end_x = stem_x + int(size * 0.4)
     flag_end_y = stem_top_y + int(size * 0.3)
     draw.line([(stem_x, stem_top_y), (flag_end_x, flag_end_y)], fill=FG_COLOR, width=3*SCALE)
@@ -195,8 +182,6 @@ def draw_weather_icon(draw, code, x, y, size):
     cx = x + size // 2
     cy = y + size // 2
     r = size // 4
-    
-    # Map WMO codes to drawing functions
     if code == 0:
         draw_sun(draw, cx, cy, r)
     elif code in [1, 2]:
@@ -215,32 +200,23 @@ def draw_weather_icon(draw, code, x, y, size):
         draw_cloud(draw, cx, cy, r)
 
 def draw_battery(draw, x, y, width, height, percentage):
-    # Draw battery body
     draw.rounded_rectangle([x, y, x + width, y + height], radius=3*SCALE, outline=FG_COLOR, width=2*SCALE)
-    # Draw battery tip (pole)
     tip_w = 4 * SCALE
     tip_h = height // 3
     tip_x = x + width
     tip_y = y + (height - tip_h) // 2
     draw.rectangle([tip_x, tip_y, tip_x + tip_w, tip_y + tip_h], fill=FG_COLOR)
-    
-    # Draw charge level inside
     inner_padding = 3 * SCALE
     max_charge_w = width - 2 * inner_padding
     charge_w = int(max_charge_w * (percentage / 100.0))
-    
     if charge_w > 0:
-        draw.rectangle(
-            [x + inner_padding, y + inner_padding, x + inner_padding + charge_w, y + height - inner_padding], 
-            fill=FG_COLOR
-        )
+        draw.rectangle([x + inner_padding, y + inner_padding, x + inner_padding + charge_w, y + height - inner_padding], fill=FG_COLOR)
 
 def process_avatar(avatar_path, size):
+    print(f"DEBUG: Avvio process_avatar per {avatar_path}")
     try:
-        # Load image (supporting transparency if PNG)
         img = Image.open(avatar_path)
-        
-        # Calculate aspect ratio to resize without distorting
+        print(f"DEBUG: Immagine aperta. Dimensioni: {img.size}, Mode: {img.mode}")
         w, h = img.size
         if w > h:
             new_w = size
@@ -248,30 +224,21 @@ def process_avatar(avatar_path, size):
         else:
             new_h = size
             new_w = int(w * (size / h))
-            
         img_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-        
-        # Create a white background canvas of the target size
+        print("DEBUG: Immagine ridimensionata")
         bg = Image.new("L", (size, size), 255)
-        
-        # Paste the resized image onto the white background
-        # If the image has transparency (alpha channel), use it as a mask
         if img.mode == "RGBA":
-            # Extract alpha channel and resize it
+            print("DEBUG: Rilevato canale Alpha")
             alpha = img.split()[3].resize((new_w, new_h), Image.Resampling.LANCZOS)
-            # Paste using alpha as mask
             bg.paste(img_resized.convert("L"), ((size - new_w) // 2, (size - new_h) // 2), mask=alpha)
         else:
-            # Paste normally in the center
             bg.paste(img_resized.convert("L"), ((size - new_w) // 2, (size - new_h) // 2))
-            
-        # Apply Floyd-Steinberg Dithering
+        print("DEBUG: Conversione in dithering 1-bit...")
         dithered = bg.convert("1")
-        
-        # Convert back to L so we can paste it on the main canvas
+        print("DEBUG: Dithering completato")
         return dithered.convert("L")
     except Exception as e:
-        print(f"Errore elaborazione avatar: {e}")
+        print(f"DEBUG ERRORE process_avatar: {e}")
         return None
 
 def get_italian_day_name(dt):
@@ -279,13 +246,10 @@ def get_italian_day_name(dt):
     return days[dt.weekday()]
 
 def get_real_weather():
+    print("DEBUG: Recupero dati meteo...")
     if os.environ.get("MOCK_MODE") == "1":
         return {
-            "current_temp": 34,
-            "current_humidity": 35,
-            "current_wind": 12,
-            "current_code": 1,
-            "current_condition": "Parz. Nuvoloso",
+            "current_temp": 34, "current_humidity": 35, "current_wind": 12, "current_code": 1, "current_condition": "Parz. Nuvoloso",
             "forecast": [
                 {"day": "Oggi", "temp_max": 34, "temp_min": 23, "code": 1},
                 {"day": "Domani", "temp_max": 37, "temp_min": 27, "code": 80},
@@ -294,152 +258,92 @@ def get_real_weather():
                 {"day": "Mar", "temp_max": 30, "temp_min": 20, "code": 2}
             ]
         }
-    
     LAT, LON = 45.6485, 9.2044
     url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=5"
-    
     weather_codes = {
-        0: "Sereno", 1: "Quasi Sereno", 2: "Parz. Nuvoloso", 3: "Nuvoloso",
-        45: "Nebbia", 48: "Nebbia", 51: "Pioggerella", 53: "Pioggerella", 55: "Pioggerella",
-        61: "Pioggia Leggera", 63: "Pioggia", 65: "Pioggia Forte",
-        71: "Neve Leggera", 73: "Neve", 75: "Neve Forte",
-        77: "Nevischio",
-        80: "Rovesci Pioggia", 81: "Rovesci Pioggia", 82: "Rovesci Pioggia",
-        85: "Rovesci Neve", 86: "Rovesci Neve",
-        95: "Temporale", 96: "Temporale", 99: "Temporale"
+        0: "Sereno", 1: "Quasi Sereno", 2: "Parz. Nuvoloso", 3: "Nuvoloso", 45: "Nebbia", 48: "Nebbia",
+        51: "Pioggerella", 53: "Pioggerella", 55: "Pioggerella", 61: "Pioggia Leggera", 63: "Pioggia", 65: "Pioggia Forte",
+        71: "Neve Leggera", 73: "Neve", 75: "Neve Forte", 77: "Nevischio", 80: "Rovesci Pioggia", 81: "Rovesci Pioggia",
+        82: "Rovesci Pioggia", 85: "Rovesci Neve", 86: "Rovesci Neve", 95: "Temporale", 96: "Temporale", 99: "Temporale"
     }
-    
     try:
         response = requests.get(url, timeout=10)
         data = response.json()
         current = data["current"]
         daily = data["daily"]
-        
         forecast_data = []
         for i in range(5):
             date_str = daily["time"][i]
             dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-            
-            if i == 0:
-                day_name = "Oggi"
-            elif i == 1:
-                day_name = "Domani"
-            else:
-                day_name = get_italian_day_name(dt)
-                
+            day_name = "Oggi" if i == 0 else ("Domani" if i == 1 else get_italian_day_name(dt))
             forecast_data.append({
-                "day": day_name,
-                "temp_max": round(daily["temperature_2m_max"][i]),
-                "temp_min": round(daily["temperature_2m_min"][i]),
-                "code": daily["weather_code"][i]
+                "day": day_name, "temp_max": round(daily["temperature_2m_max"][i]), "temp_min": round(daily["temperature_2m_min"][i]), "code": daily["weather_code"][i]
             })
-            
+        print("DEBUG: Meteo recuperato con successo")
         return {
-            "current_temp": round(current["temperature_2m"]),
-            "current_humidity": round(current["relative_humidity_2m"]),
-            "current_wind": round(current["wind_speed_10m"]),
-            "current_code": current["weather_code"],
-            "current_condition": weather_codes.get(current["weather_code"], "Variabile"),
-            "forecast": forecast_data
+            "current_temp": round(current["temperature_2m"]), "current_humidity": round(current["relative_humidity_2m"]), "current_wind": round(current["wind_speed_10m"]),
+            "current_code": current["weather_code"], "current_condition": weather_codes.get(current["weather_code"], "Variabile"), "forecast": forecast_data
         }
     except Exception as e:
-        print(f"Errore meteo: {e}")
+        print(f"DEBUG ERRORE meteo: {e}")
         return None
 
 def get_google_calendar_events():
+    print("DEBUG: Recupero eventi calendario...")
     if os.environ.get("MOCK_MODE") == "1":
-        return [
-            "- Oggi, 18:30: Aperitivo con amici",
-            "- 27/06 09:00: Riunione di condominio",
-            "- 28/06 11:00: Pranzo dai nonni",
-            "- 29/06 14:00: Dentista"
-        ]
-
+        return ["- Oggi, 18:30: Aperitivo con amici", "- 27/06 09:00: Riunione di condominio", "- 28/06 11:00: Pranzo dai nonni", "- 29/06 14:00: Dentista"]
     calendar_id = os.environ.get("CALENDAR_URL")
     creds_json = os.environ.get("GOOGLE_CALENDAR_CREDENTIALS")
-    
     if not calendar_id or not creds_json:
         return ["- Errore: Secrets non configurati"]
-    
     creds_data = json.loads(creds_json)
     credentials = Credentials.from_service_account_info(creds_data, scopes=['https://www.googleapis.com/auth/calendar.readonly'])
     service = build('calendar', 'v3', credentials=credentials)
-    
-    # Calculate timeMin (start of today in Rome time, converted to UTC)
     fuso_orario = pytz.timezone('Europe/Rome')
     now_rome = datetime.datetime.now(fuso_orario)
     start_of_today_rome = now_rome.replace(hour=0, minute=0, second=0, microsecond=0)
     start_of_today_utc = start_of_today_rome.astimezone(pytz.utc)
     time_min_str = start_of_today_utc.isoformat().replace('+00:00', 'Z')
-    
-    # Calculate timeMax (start of today + 8 days in Rome time, to cover all of the 7th day, converted to UTC)
     end_of_period_rome = start_of_today_rome + datetime.timedelta(days=8)
     end_of_period_utc = end_of_period_rome.astimezone(pytz.utc)
     time_max_str = end_of_period_utc.isoformat().replace('+00:00', 'Z')
     
     events_result = service.events().list(
-        calendarId=calendar_id, 
-        timeMin=time_min_str,
-        timeMax=time_max_str,
-        maxResults=4, # Limit to 4 events to prevent overlap with quote
-        singleEvents=True,
-        orderBy='startTime'
+        calendarId=calendar_id, timeMin=time_min_str, timeMax=time_max_str, maxResults=4, singleEvents=True, orderBy='startTime'
     ).execute()
-    
     events = events_result.get('items', [])
-    
-    # --- RIGHE DI DEBUG ---
-    print(f"DEBUG: API returned {len(events)} events raw.")
-    for e in events:
-        print(f"DEBUG: Event: {e.get('summary')} at {e['start'].get('dateTime', e['start'].get('date'))}")
-    # ----------------------
-    
+    print(f"DEBUG: Recuperati {len(events)} eventi raw")
     if not events:
         return ["Nessun impegno in programma"]
-    
     formatted_events = []
-    
     for event in events:
         summary = event.get('summary', 'Impegno senza titolo')
         start = event['start'].get('dateTime', event['start'].get('date'))
-        
         if 'T' in start:
             start_dt = datetime.datetime.fromisoformat(start.replace('Z', '+00:00')).astimezone(fuso_orario)
-            oggi = datetime.datetime.now(fuso_orario).date()
-            if start_dt.date() == oggi:
-                time_str = f"Oggi, {start_dt.strftime('%H:%M')}"
-            else:
-                time_str = start_dt.strftime('%d/%m %H:%M')
+            time_str = f"Oggi, {start_dt.strftime('%H:%M')}" if start_dt.date() == now_rome.date() else start_dt.strftime('%d/%m %H:%M')
         else:
             start_date = datetime.date.fromisoformat(start)
             time_str = f"{start_date.strftime('%d/%m')} (Tutto il giorno)"
-            
         formatted_events.append(f"- {time_str}: {summary}")
-        
     return formatted_events
 
 def get_lyrics():
-    # Load lyrics from local JSON file
     try:
         json_path = "lyrics.json"
         if not os.path.exists(json_path):
-            # Try path relative to script directory
             script_dir = os.path.dirname(os.path.realpath(__file__))
             json_path = os.path.join(script_dir, "lyrics.json")
-            
         with open(json_path, "r", encoding="utf-8") as f:
             lyrics_list = json.load(f)
         if not lyrics_list:
             return None
-        
         fuso_orario = pytz.timezone('Europe/Rome')
         now = datetime.datetime.now(fuso_orario)
         day_of_year = now.timetuple().tm_yday
-        
-        # Select based on day of year to change once a day
         return lyrics_list[day_of_year % len(lyrics_list)]
     except Exception as e:
-        print(f"Errore caricamento lyrics: {e}")
+        print(f"DEBUG ERRORE lyrics: {e}")
         return None
 
 def wrap_text(text, font, max_width, draw):
@@ -459,12 +363,12 @@ def wrap_text(text, font, max_width, draw):
     return lines
 
 def create_dashboard():
+    print("DEBUG: Creazione canvas immagine...")
     img = Image.new('L', (WIDTH, HEIGHT), color=BG_COLOR)
     draw = ImageDraw.Draw(img)
     
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
     font_bold_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    
     if not os.path.exists(font_path):
         font_path = "DejaVuSans.ttf"
         font_bold_path = "DejaVuSans-Bold.ttf"
@@ -479,91 +383,148 @@ def create_dashboard():
         font_quote = ImageFont.truetype(font_path, cfg["font_quote_size"])
         font_quote_song = ImageFont.truetype(font_path, cfg["font_quote_song_size"])
     except IOError:
-        print("Font non trovati, uso default")
-        font_header = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
-        font_regular = ImageFont.load_default()
-        font_small = ImageFont.load_default()
-        font_bold_small = ImageFont.load_default()
-        font_temp_large = ImageFont.load_default()
-        font_quote = ImageFont.load_default()
-        font_quote_song = ImageFont.load_default()
+        print("DEBUG WARNING: Font non trovati, uso default")
+        font_header = font_medium = font_regular = font_small = font_bold_small = font_temp_large = font_quote = font_quote_song = ImageFont.load_default()
 
     fuso_orario = pytz.timezone('Europe/Rome')
     now = datetime.datetime.now(fuso_orario)
     
-    # --- 1. Header (Avatar + Title/Date + Battery) ---
-    
-    # A) Draw Avatar (noi sticker.png or noi sticker.jpg) on the left (Sticker mode)
+    # --- 1. Header ---
     avatar_path = "noi sticker.png"
     if not os.path.exists(avatar_path):
         avatar_path = "noi sticker.jpg"
-        
     if not os.path.exists(avatar_path):
-        # Try path relative to script directory
         script_dir = os.path.dirname(os.path.realpath(__file__))
         avatar_path = os.path.join(script_dir, "noi sticker.png")
         if not os.path.exists(avatar_path):
             avatar_path = os.path.join(script_dir, "noi sticker.jpg")
         
     avatar_drawn = False
+    print(f"DEBUG: Controllo presenza avatar al percorso: {avatar_path}")
     if os.path.exists(avatar_path):
         avatar_img = process_avatar(avatar_path, cfg["avatar_size"])
         if avatar_img:
             img.paste(avatar_img, (cfg["margin_x"], cfg["avatar_y"]))
             avatar_drawn = True
+            print("DEBUG: Avatar incollato sul canvas")
             
-    # B) Draw Title and Date (Centered or shifted to the right of Avatar)
     header_str = "Silvia & Niki's Home"
     days = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
     months = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
     date_str = f"{days[now.weekday()]} {now.day} {months[now.month-1]} {now.year}"
     
     if avatar_drawn:
-        # Shift text to the right to avoid overlapping with the avatar
         text_start_x = cfg["margin_x"] + cfg["avatar_size"] + 30 * SCALE
         draw.text((text_start_x, cfg["header_y"] + 10 * SCALE), header_str, font=font_header, fill=FG_COLOR)
         draw.text((text_start_x, cfg["date_y"] + 10 * SCALE), date_str, font=font_regular, fill=FG_COLOR)
     else:
-        # Centered layout if no avatar is found
         w_header = draw.textlength(header_str, font=font_header)
         draw.text(((WIDTH - w_header) / 2, cfg["header_y"]), header_str, font=font_header, fill=FG_COLOR)
         w_date = draw.textlength(date_str, font=font_regular)
         draw.text(((WIDTH - w_date) / 2, cfg["date_y"]), date_str, font=font_regular, fill=FG_COLOR)
         
-    # C) Draw Battery Icon on the top right
-    # Read battery from query parameter (we will pass it via URL), default to 80% for preview
+    # Batteria
     try:
         battery_pct = int(os.environ.get("KINDLE_BATTERY", "80"))
     except ValueError:
         battery_pct = 80
-        
     battery_x = WIDTH - cfg["margin_x"] - cfg["battery_width"]
     draw_battery(draw, battery_x, cfg["battery_y"], cfg["battery_width"], cfg["battery_height"], battery_pct)
-    
-    # Draw battery percentage text next to it
     batt_text = f"{battery_pct}%"
     w_batt_text = draw.textlength(batt_text, font=font_small)
-    draw.text(
-        (battery_x - w_batt_text - 10 * SCALE, cfg["battery_y"] + (cfg["battery_height"] - cfg["font_small_size"]) // 2), 
-        batt_text, 
-        font=font_small, 
-        fill=FG_COLOR
-    )
+    draw.text((battery_x - w_batt_text - 10 * SCALE, cfg["battery_y"] + (cfg["battery_height"] - cfg["font_small_size"]) // 2), batt_text, font=font_small, fill=FG_COLOR)
 
     # Linea 1
     draw.line([(cfg["margin_x"], cfg["line1_y"]), (WIDTH - cfg["margin_x"], cfg["line1_y"])], fill=FG_COLOR, width=2*SCALE)
 
-    # Fetch weather data
+    # Meteo
     weather = get_real_weather()
-
-    # 2. Current Weather Block (Hybrid Layout)
     if weather:
         curr_y = cfg["curr_weather_y"]
         icon_size_large = cfg["curr_weather_icon_size"]
-        
-        # Left: Large Icon
         icon_x = cfg["margin_x"]
         draw_weather_icon(draw, weather["current_code"], icon_x, curr_y, icon_size_large)
-        
-        # Center: Location, Condition, Humidity
+        text_x = icon_x + icon_size_large + 30 * SCALE
+        draw.text((text_x, curr_y + 5 * SCALE), "Seregno", font=font_medium, fill=FG_COLOR)
+        draw.text((text_x, curr_y + 45 * SCALE), weather["current_condition"], font=font_regular, fill=FG_COLOR)
+        details_str = f"Umidità: {weather['current_humidity']}%  |  Vento: {weather['current_wind']} km/h"
+        draw.text((text_x, curr_y + 80 * SCALE), details_str, font=font_small, fill=FG_COLOR)
+        temp_str = f"{weather['current_temp']}°"
+        w_temp = draw.textlength(temp_str, font=font_temp_large)
+        temp_x = WIDTH - cfg["margin_x"] - w_temp
+        draw.text((temp_x, curr_y + 10 * SCALE), temp_str, font=font_temp_large, fill=FG_COLOR)
+
+    # Previsioni Settimanali
+    if weather:
+        y_forecast = cfg["forecast_y"]
+        col_width = (WIDTH - 2 * cfg["margin_x"]) / 5
+        icon_size = cfg["forecast_icon_size"]
+        for i, fc in enumerate(weather["forecast"]):
+            col_x = cfg["margin_x"] + i * col_width
+            cx = col_x + col_width // 2
+            w_day = draw.textlength(fc["day"], font=font_regular)
+            draw.text((cx - w_day / 2, y_forecast), fc["day"], font=font_regular, fill=FG_COLOR)
+            icon_x = cx - icon_size // 2
+            icon_y = y_forecast + 40 * SCALE
+            draw_weather_icon(draw, fc["code"], icon_x, icon_y, icon_size)
+            temp_str = f"{fc['temp_max']}° / {fc['temp_min']}°"
+            w_temp = draw.textlength(temp_str, font=font_small)
+            draw.text((cx - w_temp / 2, icon_y + icon_size + 15 * SCALE), temp_str, font=font_bold_small, fill=FG_COLOR)
+            if i > 0:
+                draw.line([(col_x, y_forecast), (col_x, y_forecast + icon_size + 70 * SCALE)], fill=FG_COLOR, width=1*SCALE)
+
+    # Linea 2
+    draw.line([(cfg["margin_x"], cfg["line2_y"]), (WIDTH - cfg["margin_x"], cfg["line2_y"])], fill=FG_COLOR, width=2*SCALE)
+
+    # Calendario
+    draw.text((cfg["margin_x"], cfg["cal_title_y"]), "I PROSSIMI IMPEGNI", font=font_medium, fill=FG_COLOR)
+    try:
+        eventi = get_google_calendar_events()
+    except Exception as e:
+        eventi = [f"- Errore Calendario: {str(e)[:45]}..."]
+    y_offset = cfg["events_start_y"]
+    for evento in eventi:
+        if len(evento) > cfg["max_event_len"]:
+            evento = evento[:cfg["max_event_len"]-3] + "..."
+        draw.text((cfg["margin_x"], y_offset), evento, font=font_regular, fill=FG_COLOR)
+        y_offset += cfg["event_step"]
+
+    # Frase del giorno
+    quote_data = get_lyrics()
+    if quote_data:
+        box_y1 = cfg["quote_box_y1"]
+        box_y2 = box_y1 + cfg["quote_box_height"]
+        box_x1 = cfg["margin_x"]
+        box_x2 = WIDTH - cfg["margin_x"]
+        draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], radius=15*SCALE, fill=BOX_BG_COLOR, outline=FG_COLOR, width=2*SCALE)
+        music_icon_size = 25 * SCALE
+        draw_music_note(draw, WIDTH // 2, box_y1 + 35 * SCALE, music_icon_size)
+        quote_text_formatted = f'"{quote_data["text"]}"'
+        max_text_width = (box_x2 - box_x1) - 60 * SCALE
+        quote_lines = wrap_text(quote_text_formatted, font_quote, max_text_width, draw)
+        y_curr = box_y1 + 75 * SCALE
+        for line in quote_lines:
+            w_line = draw.textlength(line, font=font_quote)
+            draw.text(((WIDTH - w_line) / 2, y_curr), line, font=font_quote, fill=FG_COLOR)
+            y_curr += cfg["quote_line_step"]
+        song_str = f"— {quote_data['song']}"
+        w_song = draw.textlength(song_str, font=font_quote_song)
+        draw.text(((WIDTH - w_song) / 2, y_curr + 10 * SCALE), song_str, font=font_quote_song, fill=FG_COLOR)
+
+    # Footer
+    time_str = now.strftime("%H:%M")
+    date_update_str = now.strftime("%d/%m")
+    footer_str = f"Ultimo aggiornamento: {date_update_str} alle {time_str}"
+    w_footer = draw.textlength(footer_str, font=font_small)
+    draw.text(((WIDTH - w_footer) / 2, cfg["last_update_y"]), footer_str, font=font_small, fill=FG_COLOR)
+
+    # Salvataggio
+    print("DEBUG: Salvataggio immagine finale...")
+    img_grayscale = img.convert('L')
+    img_grayscale.putpixel((0, 0), 250)
+    img_resized = img_grayscale.resize((TARGET_WIDTH, TARGET_HEIGHT), Image.Resampling.LANCZOS)
+    img_resized.save(os.path.join(OUTPUT_DIR, "dashboard.png"), "PNG")
+    print(f"DEBUG: Dashboard salvata con successo. Fine script.")
+
+if __name__ == "__main__":
+    create_dashboard()
