@@ -55,7 +55,7 @@ PROFILES = {
         "date_y": 135,
         "line1_y": 210,
         "curr_weather_y": 230,
-        "curr_weather_icon_size": 150,
+        "curr_weather_icon_size": 150, # Updated to 150
         "forecast_y": 400,
         "forecast_icon_size": 100,
         "line2_y": 620,
@@ -69,7 +69,7 @@ PROFILES = {
         "quote_line_step": 40,
         "last_update_y": 1360,
         "max_event_len": 50,
-        "avatar_size": 150,
+        "avatar_size": 150, # Updated to 150
         "avatar_y": 55,
         "battery_y": 75,
         "battery_width": 60,
@@ -133,7 +133,9 @@ def draw_sun_behind_cloud(draw, cx, cy, r):
     draw_cloud(draw, cx - r*0.2, cy + r*0.2, r*0.9)
 
 def draw_two_clouds(draw, cx, cy, r):
+    # Back cloud, smaller
     draw_cloud(draw, cx + r*0.3, cy - r*0.2, r*0.75)
+    # Front cloud, filled with white
     draw_cloud(draw, cx - r*0.2, cy + r*0.2, r*0.9)
 
 def draw_rain(draw, cx, cy, r):
@@ -280,6 +282,8 @@ def get_real_weather():
         daily = data["daily"]
         
         current_code = current.get("weather_code", 0)
+        print(f"DEBUG METEO: Corrente = {current_code} ({weather_codes.get(current_code, 'N/A')})")
+        print(f"DEBUG METEO: Dati Daily grezzi = {daily['weather_code']}")
         
         forecast_data = []
         for i in range(5):
@@ -287,12 +291,13 @@ def get_real_weather():
             dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
             day_name = "Oggi" if i == 0 else ("Domani" if i == 1 else get_italian_day_name(dt))
             
-            # Per "Oggi", usa il codice meteo corrente se quello daily è assente o incoerente
             raw_code = daily["weather_code"][i]
-            if i == 0 and (raw_code is None or raw_code == ""):
-                code = current_code
+            if raw_code is None or raw_code == "":
+                code = current_code if i == 0 else 3
             else:
-                code = int(raw_code) if raw_code is not None else 3
+                code = int(raw_code)
+                
+            print(f"DEBUG METEO: Giorno {i} ({day_name}) -> raw={raw_code} -> interpretato={code} ({weather_codes.get(code, 'N/A')})")
                 
             forecast_data.append({
                 "day": day_name,
