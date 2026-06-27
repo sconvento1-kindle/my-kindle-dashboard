@@ -258,31 +258,57 @@ def get_real_weather():
                 {"day": "Mar", "temp_max": 30, "temp_min": 20, "code": 2}
             ]
         }
+    
     LAT, LON = 45.6485, 9.2044
     url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=5"
+    
     weather_codes = {
-        0: "Sereno", 1: "Quasi Sereno", 2: "Parz. Nuvoloso", 3: "Nuvoloso", 45: "Nebbia", 48: "Nebbia",
-        51: "Pioggerella", 53: "Pioggerella", 55: "Pioggerella", 61: "Pioggia Leggera", 63: "Pioggia", 65: "Pioggia Forte",
-        71: "Neve Leggera", 73: "Neve", 75: "Neve Forte", 77: "Nevischio", 80: "Rovesci Pioggia", 81: "Rovesci Pioggia",
-        82: "Rovesci Pioggia", 85: "Rovesci Neve", 86: "Rovesci Neve", 95: "Temporale", 96: "Temporale", 99: "Temporale"
+        0: "Sereno", 1: "Quasi Sereno", 2: "Parz. Nuvoloso", 3: "Nuvoloso",
+        45: "Nebbia", 48: "Nebbia", 51: "Pioggerella", 53: "Pioggerella", 55: "Pioggerella",
+        61: "Pioggia Leggera", 63: "Pioggia", 65: "Pioggia Forte",
+        71: "Neve Leggera", 73: "Neve", 75: "Neve Forte",
+        77: "Nevischio",
+        80: "Rovesci Pioggia", 81: "Rovesci Pioggia", 82: "Rovesci Pioggia",
+        85: "Rovesci Neve", 86: "Rovesci Neve",
+        95: "Temporale", 96: "Temporale", 99: "Temporale"
     }
+    
     try:
         response = requests.get(url, timeout=10)
         data = response.json()
         current = data["current"]
         daily = data["daily"]
+        
+        current_code = current.get("weather_code", 0)
+        
         forecast_data = []
         for i in range(5):
             date_str = daily["time"][i]
             dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
             day_name = "Oggi" if i == 0 else ("Domani" if i == 1 else get_italian_day_name(dt))
+            
+            # Per "Oggi", usa il codice meteo corrente se quello daily è assente o incoerente
+            raw_code = daily["weather_code"][i]
+            if i == 0 and (raw_code is None or raw_code == ""):
+                code = current_code
+            else:
+                code = int(raw_code) if raw_code is not None else 3
+                
             forecast_data.append({
-                "day": day_name, "temp_max": round(daily["temperature_2m_max"][i]), "temp_min": round(daily["temperature_2m_min"][i]), "code": daily["weather_code"][i]
+                "day": day_name,
+                "temp_max": round(daily["temperature_2m_max"][i]),
+                "temp_min": round(daily["temperature_2m_min"][i]),
+                "code": code
             })
+            
         print("DEBUG: Meteo recuperato con successo")
         return {
-            "current_temp": round(current["temperature_2m"]), "current_humidity": round(current["relative_humidity_2m"]), "current_wind": round(current["wind_speed_10m"]),
-            "current_code": current["weather_code"], "current_condition": weather_codes.get(current["weather_code"], "Variabile"), "forecast": forecast_data
+            "current_temp": round(current["temperature_2m"]),
+            "current_humidity": round(current["relative_humidity_2m"]),
+            "current_wind": round(current["wind_speed_10m"]),
+            "current_code": current_code,
+            "current_condition": weather_codes.get(current_code, "Variabile"),
+            "forecast": forecast_data
         }
     except Exception as e:
         print(f"DEBUG ERRORE meteo: {e}")
