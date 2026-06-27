@@ -237,34 +237,34 @@ def draw_battery(draw, x, y, width, height, percentage):
 
 def process_avatar(avatar_path, size):
     try:
-        # Load and convert to grayscale
-        img = Image.open(avatar_path).convert("L")
+        # Load image (supporting transparency if PNG)
+        img = Image.open(avatar_path)
         
-        # Crop to square (center crop)
+        # Calculate aspect ratio to resize without distorting
         w, h = img.size
-        min_dim = min(w, h)
-        left = (w - min_dim) / 2
-        top = (h - min_dim) / 2
-        right = (w + min_dim) / 2
-        bottom = (h + min_dim) / 2
-        img = img.crop((left, top, right, bottom))
+        if w > h:
+            new_w = size
+            new_h = int(h * (size / w))
+        else:
+            new_h = size
+            new_w = int(w * (size / h))
+            
+        img_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
         
-        # Resize to target size
-        img = img.resize((size, size), Image.Resampling.LANCZOS)
-        
-        # Create circular mask
-        mask = Image.new("L", (size, size), 0)
-        draw_mask = ImageDraw.Draw(mask)
-        draw_mask.ellipse([0, 0, size, size], fill=255)
-        
-        # Apply mask to make it circular
-        circular_img = ImageOps.fit(img, (size, size))
-        circular_img.putalpha(mask)
-        
-        # Convert back to L (grayscale) with white background to preserve circle shape
+        # Create a white background canvas of the target size
         bg = Image.new("L", (size, size), 255)
-        bg.paste(circular_img, (0, 0), mask=mask)
         
+        # Paste the resized image onto the white background
+        # If the image has transparency (alpha channel), use it as a mask
+        if img.mode == "RGBA":
+            # Extract alpha channel and resize it
+            alpha = img.split()[3].resize((new_w, new_h), Image.Resampling.LANCZOS)
+            # Paste using alpha as mask
+            bg.paste(img_resized.convert("L"), ((size - new_w) // 2, (size - new_h) // 2), mask=alpha)
+        else:
+            # Paste normally in the center
+            bg.paste(img_resized.convert("L"), ((size - new_w) // 2, (size - new_h) // 2))
+            
         # Apply Floyd-Steinberg Dithering
         dithered = bg.convert("1")
         
@@ -494,12 +494,17 @@ def create_dashboard():
     
     # --- 1. Header (Avatar + Title/Date + Battery) ---
     
-    # A) Draw Avatar (zoe.jpg) on the left
-    avatar_path = "zoe.jpg"
+    # A) Draw Avatar (noi sticker.png or noi sticker.jpg) on the left (Sticker mode)
+    avatar_path = "noi sticker.png"
+    if not os.path.exists(avatar_path):
+        avatar_path = "noi sticker.jpg"
+        
     if not os.path.exists(avatar_path):
         # Try path relative to script directory
         script_dir = os.path.dirname(os.path.realpath(__file__))
-        avatar_path = os.path.join(script_dir, "zoe.jpg")
+        avatar_path = os.path.join(script_dir, "noi sticker.png")
+        if not os.path.exists(avatar_path):
+            avatar_path = os.path.join(script_dir, "noi sticker.jpg")
         
     avatar_drawn = False
     if os.path.exists(avatar_path):
@@ -561,124 +566,4 @@ def create_dashboard():
         icon_x = cfg["margin_x"]
         draw_weather_icon(draw, weather["current_code"], icon_x, curr_y, icon_size_large)
         
-        # Center: Location, Condition, Humidity/Wind
-        text_x = icon_x + icon_size_large + 30 * SCALE
-        draw.text((text_x, curr_y + 5 * SCALE), "Seregno", font=font_medium, fill=FG_COLOR)
-        draw.text((text_x, curr_y + 45 * SCALE), weather["current_condition"], font=font_regular, fill=FG_COLOR)
-        
-        details_str = f"Umidità: {weather['current_humidity']}%  |  Vento: {weather['current_wind']} km/h"
-        draw.text((text_x, curr_y + 80 * SCALE), details_str, font=font_small, fill=FG_COLOR)
-        
-        # Right: Large Temp (No min/max below it)
-        temp_str = f"{weather['current_temp']}°"
-        w_temp = draw.textlength(temp_str, font=font_temp_large)
-        temp_x = WIDTH - cfg["margin_x"] - w_temp
-        draw.text((temp_x, curr_y + 10 * SCALE), temp_str, font=font_temp_large, fill=FG_COLOR)
-
-    # 3. Weather Section (Weekly Forecast)
-    if weather:
-        y_forecast = cfg["forecast_y"]
-        col_width = (WIDTH - 2 * cfg["margin_x"]) / 5
-        icon_size = cfg["forecast_icon_size"]
-        
-        for i, fc in enumerate(weather["forecast"]):
-            col_x = cfg["margin_x"] + i * col_width
-            cx = col_x + col_width // 2
-            
-            # Day name
-            w_day = draw.textlength(fc["day"], font=font_regular)
-            draw.text((cx - w_day / 2, y_forecast), fc["day"], font=font_regular, fill=FG_COLOR)
-            
-            # Icon
-            icon_x = cx - icon_size // 2
-            icon_y = y_forecast + 40 * SCALE
-            draw_weather_icon(draw, fc["code"], icon_x, icon_y, icon_size)
-            
-            # Temp Max / Min
-            temp_str = f"{fc['temp_max']}° / {fc['temp_min']}°"
-            w_temp = draw.textlength(temp_str, font=font_small)
-            draw.text((cx - w_temp / 2, icon_y + icon_size + 15 * SCALE), temp_str, font=font_bold_small, fill=FG_COLOR)
-            
-            # Vertical separator
-            if i > 0:
-                draw.line([(col_x, y_forecast), (col_x, y_forecast + icon_size + 70 * SCALE)], fill=FG_COLOR, width=1*SCALE)
-    else:
-        draw.text((cfg["margin_x"], cfg["forecast_y"]), "Dati Meteo Non Disponibili", font=font_regular, fill=FG_COLOR)
-
-    # Linea 2
-    draw.line([(cfg["margin_x"], cfg["line2_y"]), (WIDTH - cfg["margin_x"], cfg["line2_y"])], fill=FG_COLOR, width=2*SCALE)
-
-    # 4. Calendar Section
-    draw.text((cfg["margin_x"], cfg["cal_title_y"]), "I PROSSIMI IMPEGNI", font=font_medium, fill=FG_COLOR)
-    
-    try:
-        eventi = get_google_calendar_events()
-    except Exception as e:
-        error_msg = str(e).replace('\n', ' ').strip()
-        eventi = [f"- Errore Calendario: {error_msg[:45]}..."]
-    
-    y_offset = cfg["events_start_y"]
-    for evento in eventi:
-        if len(evento) > cfg["max_event_len"]:
-            evento = evento[:cfg["max_event_len"]-3] + "..."
-        draw.text((cfg["margin_x"], y_offset), evento, font=font_regular, fill=FG_COLOR)
-        y_offset += cfg["event_step"]
-
-    # 5. Quote of the Day Section (Inside a rounded box card)
-    quote_data = get_lyrics()
-    if quote_data:
-        box_y1 = cfg["quote_box_y1"]
-        box_y2 = box_y1 + cfg["quote_box_height"]
-        box_x1 = cfg["margin_x"]
-        box_x2 = WIDTH - cfg["margin_x"]
-        
-        # Draw light gray rounded rectangle card
-        draw.rounded_rectangle(
-            [box_x1, box_y1, box_x2, box_y2], 
-            radius=15*SCALE, 
-            fill=BOX_BG_COLOR, 
-            outline=FG_COLOR, 
-            width=2*SCALE
-        )
-        
-        # Draw Music Note Icon centered in the top part of the box
-        music_icon_size = 25 * SCALE
-        draw_music_note(draw, WIDTH // 2, box_y1 + 35 * SCALE, music_icon_size)
-        
-        # Quote Text wrapped (with extra padding for box borders)
-        quote_text_formatted = f'"{quote_data["text"]}"'
-        max_text_width = (box_x2 - box_x1) - 60 * SCALE # 30px padding on each side
-        quote_lines = wrap_text(quote_text_formatted, font_quote, max_text_width, draw)
-        
-        y_curr = box_y1 + 75 * SCALE # Start drawing text below music note
-        for line in quote_lines:
-            w_line = draw.textlength(line, font=font_quote)
-            draw.text(((WIDTH - w_line) / 2, y_curr), line, font=font_quote, fill=FG_COLOR)
-            y_curr += cfg["quote_line_step"]
-            
-        # Song Info
-        song_str = f"— {quote_data['song']}"
-        w_song = draw.textlength(song_str, font=font_quote_song)
-        draw.text(((WIDTH - w_song) / 2, y_curr + 10 * SCALE), song_str, font=font_quote_song, fill=FG_COLOR)
-
-    # Footer: Info Ultimo Aggiornamento
-    time_str = now.strftime("%H:%M")
-    date_update_str = now.strftime("%d/%m")
-    footer_str = f"Ultimo aggiornamento: {date_update_str} alle {time_str}"
-    w_footer = draw.textlength(footer_str, font=font_small)
-    draw.text(((WIDTH - w_footer) / 2, cfg["last_update_y"]), footer_str, font=font_small, fill=FG_COLOR)
-
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-        
-    # Resize high-res image back to target resolution with Lanczos filter
-    img_grayscale = img.convert('L')
-    img_grayscale.putpixel((0, 0), 250)
-    
-    img_resized = img_grayscale.resize((TARGET_WIDTH, TARGET_HEIGHT), Image.Resampling.LANCZOS)
-    img_resized.save(os.path.join(OUTPUT_DIR, "dashboard.png"), "PNG")
-    
-    print(f"Dashboard generata con successo alle ore: {time_str} del {date_str}")
-
-if __name__ == "__main__":
-    create_dashboard()
+        # Center: Location, Condition, Humidity
