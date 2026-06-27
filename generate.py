@@ -55,7 +55,7 @@ PROFILES = {
         "date_y": 135,
         "line1_y": 210,
         "curr_weather_y": 230,
-        "curr_weather_icon_size": 120,
+        "curr_weather_icon_size": 150,
         "forecast_y": 400,
         "forecast_icon_size": 100,
         "line2_y": 620,
