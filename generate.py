@@ -2,7 +2,7 @@ import os
 import datetime
 import json
 import math
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import requests
 import pytz
 from google.oauth2.service_account import Credentials
@@ -13,7 +13,7 @@ PROFILES = {
     "KINDLE_BASIC": {
         "width": 800,
         "height": 600,
-        "font_header_size": 40,
+        "font_header_size": 32,
         "font_medium_size": 22,
         "font_regular_size": 16,
         "font_small_size": 12,
@@ -33,20 +33,24 @@ PROFILES = {
         "quote_box_height": 90,
         "font_quote_size": 13,
         "font_quote_song_size": 10,
-        "quote_line_step": 20,
         "last_update_y": 570,
-        "max_event_len": 45
+        "max_event_len": 45,
+        "avatar_size": 60,
+        "avatar_y": 20,
+        "battery_y": 25,
+        "battery_width": 35,
+        "battery_height": 18
     },
     "KINDLE_PW4_PORTRAIT": {
         "width": 1072,
         "height": 1448,
-        "font_header_size": 60,
+        "font_header_size": 48, # Slightly smaller to accommodate avatar
         "font_medium_size": 35,
         "font_regular_size": 26,
         "font_small_size": 20,
         "margin_x": 80,
-        "header_y": 70,
-        "date_y": 145,
+        "header_y": 65,
+        "date_y": 135,
         "line1_y": 210,
         "curr_weather_y": 230,
         "curr_weather_icon_size": 120,
@@ -62,7 +66,12 @@ PROFILES = {
         "font_quote_song_size": 18,
         "quote_line_step": 40,
         "last_update_y": 1360,
-        "max_event_len": 50
+        "max_event_len": 50,
+        "avatar_size": 110,
+        "avatar_y": 55,
+        "battery_y": 75,
+        "battery_width": 60,
+        "battery_height": 30
     }
 }
 
@@ -204,6 +213,66 @@ def draw_weather_icon(draw, code, x, y, size):
         draw_thunder(draw, cx, cy, r)
     else:
         draw_cloud(draw, cx, cy, r)
+
+def draw_battery(draw, x, y, width, height, percentage):
+    # Draw battery body
+    draw.rounded_rectangle([x, y, x + width, y + height], radius=3*SCALE, outline=FG_COLOR, width=2*SCALE)
+    # Draw battery tip (pole)
+    tip_w = 4 * SCALE
+    tip_h = height // 3
+    tip_x = x + width
+    tip_y = y + (height - tip_h) // 2
+    draw.rectangle([tip_x, tip_y, tip_x + tip_w, tip_y + tip_h], fill=FG_COLOR)
+    
+    # Draw charge level inside
+    inner_padding = 3 * SCALE
+    max_charge_w = width - 2 * inner_padding
+    charge_w = int(max_charge_w * (percentage / 100.0))
+    
+    if charge_w > 0:
+        draw.rectangle(
+            [x + inner_padding, y + inner_padding, x + inner_padding + charge_w, y + height - inner_padding], 
+            fill=FG_COLOR
+        )
+
+def process_avatar(avatar_path, size):
+    try:
+        # Load and convert to grayscale
+        img = Image.open(avatar_path).convert("L")
+        
+        # Crop to square (center crop)
+        w, h = img.size
+        min_dim = min(w, h)
+        left = (w - min_dim) / 2
+        top = (h - min_dim) / 2
+        right = (w + min_dim) / 2
+        bottom = (h + min_dim) / 2
+        img = img.crop((left, top, right, bottom))
+        
+        # Resize to target size
+        img = img.resize((size, size), Image.Resampling.LANCZOS)
+        
+        # Create circular mask
+        mask = Image.new("L", (size, size), 0)
+        draw_mask = ImageDraw.Draw(mask)
+        draw_mask.ellipse([0, 0, size, size], fill=255)
+        
+        # Apply mask to make it circular
+        circular_img = ImageOps.fit(img, (size, size))
+        circular_img.putalpha(mask)
+        
+        # Convert back to L (grayscale) with white background to preserve circle shape
+        bg = Image.new("L", (size, size), 255)
+        bg.paste(circular_img, (0, 0), mask=mask)
+        
+        # Apply Floyd-Steinberg Dithering
+        dithered = bg.convert("1")
+        
+        # Convert back to L so we can paste it on the main canvas
+        return dithered.convert("L")
+    except Exception as e:
+        print(f"Errore elaborazione avatar: {e}")
+        return None
 
 def get_italian_day_name(dt):
     days = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
@@ -423,17 +492,59 @@ def create_dashboard():
     fuso_orario = pytz.timezone('Europe/Rome')
     now = datetime.datetime.now(fuso_orario)
     
-    # 1. Header (Custom Text)
-    header_str = "Silvia & Niki's Home"
-    w_header = draw.textlength(header_str, font=font_header)
-    draw.text(((WIDTH - w_header) / 2, cfg["header_y"]), header_str, font=font_header, fill=FG_COLOR)
+    # --- 1. Header (Avatar + Title/Date + Battery) ---
     
-    # Date Subheader
+    # A) Draw Avatar (zoe.jpg) on the left
+    avatar_path = "zoe.jpg"
+    if not os.path.exists(avatar_path):
+        # Try path relative to script directory
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        avatar_path = os.path.join(script_dir, "zoe.jpg")
+        
+    avatar_drawn = False
+    if os.path.exists(avatar_path):
+        avatar_img = process_avatar(avatar_path, cfg["avatar_size"])
+        if avatar_img:
+            img.paste(avatar_img, (cfg["margin_x"], cfg["avatar_y"]))
+            avatar_drawn = True
+            
+    # B) Draw Title and Date (Centered or shifted to the right of Avatar)
+    header_str = "Silvia & Niki's Home"
     days = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
     months = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
     date_str = f"{days[now.weekday()]} {now.day} {months[now.month-1]} {now.year}"
-    w_date = draw.textlength(date_str, font=font_regular)
-    draw.text(((WIDTH - w_date) / 2, cfg["date_y"]), date_str, font=font_regular, fill=FG_COLOR)
+    
+    if avatar_drawn:
+        # Shift text to the right to avoid overlapping with the avatar
+        text_start_x = cfg["margin_x"] + cfg["avatar_size"] + 30 * SCALE
+        draw.text((text_start_x, cfg["header_y"] + 10 * SCALE), header_str, font=font_header, fill=FG_COLOR)
+        draw.text((text_start_x, cfg["date_y"] + 10 * SCALE), date_str, font=font_regular, fill=FG_COLOR)
+    else:
+        # Centered layout if no avatar is found
+        w_header = draw.textlength(header_str, font=font_header)
+        draw.text(((WIDTH - w_header) / 2, cfg["header_y"]), header_str, font=font_header, fill=FG_COLOR)
+        w_date = draw.textlength(date_str, font=font_regular)
+        draw.text(((WIDTH - w_date) / 2, cfg["date_y"]), date_str, font=font_regular, fill=FG_COLOR)
+        
+    # C) Draw Battery Icon on the top right
+    # Read battery from query parameter (we will pass it via URL), default to 80% for preview
+    try:
+        battery_pct = int(os.environ.get("KINDLE_BATTERY", "80"))
+    except ValueError:
+        battery_pct = 80
+        
+    battery_x = WIDTH - cfg["margin_x"] - cfg["battery_width"]
+    draw_battery(draw, battery_x, cfg["battery_y"], cfg["battery_width"], cfg["battery_height"], battery_pct)
+    
+    # Draw battery percentage text next to it
+    batt_text = f"{battery_pct}%"
+    w_batt_text = draw.textlength(batt_text, font=font_small)
+    draw.text(
+        (battery_x - w_batt_text - 10 * SCALE, cfg["battery_y"] + (cfg["battery_height"] - cfg["font_small_size"]) // 2), 
+        batt_text, 
+        font=font_small, 
+        fill=FG_COLOR
+    )
 
     # Linea 1
     draw.line([(cfg["margin_x"], cfg["line1_y"]), (WIDTH - cfg["margin_x"], cfg["line1_y"])], fill=FG_COLOR, width=2*SCALE)
