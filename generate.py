@@ -133,9 +133,7 @@ def draw_sun_behind_cloud(draw, cx, cy, r):
     draw_cloud(draw, cx - r*0.2, cy + r*0.2, r*0.9)
 
 def draw_two_clouds(draw, cx, cy, r):
-    # Back cloud, smaller
     draw_cloud(draw, cx + r*0.3, cy - r*0.2, r*0.75)
-    # Front cloud, filled with white
     draw_cloud(draw, cx - r*0.2, cy + r*0.2, r*0.9)
 
 def draw_rain(draw, cx, cy, r):
@@ -291,7 +289,6 @@ def get_real_weather():
             dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
             day_name = "Oggi" if i == 0 else ("Domani" if i == 1 else get_italian_day_name(dt))
             
-            # Forza la colonna "Oggi" a usare lo stesso codice del meteo corrente (in tempo reale)
             if i == 0:
                 code = current_code
             else:
@@ -459,10 +456,19 @@ def create_dashboard():
         draw.text(((WIDTH - w_date) / 2, cfg["date_y"]), date_str, font=font_regular, fill=FG_COLOR)
         
     # Batteria
+    raw_batt = os.environ.get("KINDLE_BATTERY", "")
+    print(f"DEBUG BATTERIA: Valore ricevuto env KINDLE_BATTERY = '{raw_batt}'")
     try:
-        battery_pct = int(os.environ.get("KINDLE_BATTERY", "80"))
-    except ValueError:
+        if raw_batt and str(raw_batt).strip():
+            clean_batt = ''.join(c for c in str(raw_batt) if c.isdigit())
+            battery_pct = int(clean_batt) if clean_batt else 80
+        else:
+            battery_pct = 80
+    except Exception as e:
+        print(f"DEBUG BATTERIA Errore parsing: {e}")
         battery_pct = 80
+    print(f"DEBUG BATTERIA: Batteria finale applicata = {battery_pct}%")
+        
     battery_x = WIDTH - cfg["margin_x"] - cfg["battery_width"]
     draw_battery(draw, battery_x, cfg["battery_y"], cfg["battery_width"], cfg["battery_height"], battery_pct)
     batt_text = f"{battery_pct}%"
