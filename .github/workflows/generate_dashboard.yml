@@ -32,6 +32,7 @@ jobs:
         env:
           CALENDAR_URL: ${{ secrets.CALENDAR_URL }}
           GOOGLE_CALENDAR_CREDENTIALS: ${{ secrets.GOOGLE_CALENDAR_CREDENTIALS }}
+          KINDLE_BATTERY: ${{ github.event.client_payload.battery }}
         run: python generate.py
 
       - name: Deploy to GitHub Pages
